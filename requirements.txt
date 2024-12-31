@@ -4,3 +4,4 @@ flask
 python-telegram-bot
 requests
 flask_restx
+ollama
