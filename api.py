@@ -11,7 +11,7 @@ app = Flask(__name__)
 api = Api(
     app,
     version='1.0',
-    title='Coti Agent Swagger API',
+    title='CKB Agent Swagger API',
     description='This is an automatically generated Swagger UI for all APIs',
     doc='/api-docs/'
 )
@@ -66,4 +66,4 @@ class VerifyAddress(Resource):
         return jsonify(success=True)
     
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    app.run(debug=True, host="0.0.0.0", port=8081)

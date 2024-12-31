@@ -12,7 +12,7 @@ def ask_bot(user_msg, bot_name, user_address):
             },
             headers={
                 'Content-Type': 'application/json',
-                'app-key': os.environ['APP_KEY']
+                'x-app-key': os.environ['APP_KEY']
             }
         )
         response_data = response.json()
