@@ -1,11 +1,11 @@
 [Unit]
-Description=Coti Agent
+Description=CKB Agent
 After=network.target
 
 [Service]
-WorkingDirectory=/home/ubuntu/ac-ai-model/agent
-Environment="PATH=/home/ubuntu/ac-ai-model/agent/pyenv/bin"
-ExecStart=/home/ubuntu/ac-ai-model/agent/pyenv/bin/python api.py
+WorkingDirectory=/home/ubuntu/utxo-global-tg-bot
+Environment="PATH=/home/ubuntu/utxo-global-tg-bot/pyenv/bin"
+ExecStart=/home/ubuntu/utxo-global-tg-bot/pyenv/bin/python api.py
 
 [Install]
 WantedBy=multi-user.target
