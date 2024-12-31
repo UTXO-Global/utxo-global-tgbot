@@ -3,3 +3,4 @@ pyenv
 db
 model
 test
+*.zip

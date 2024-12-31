@@ -2,11 +2,13 @@ from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, MessageHandler, filters, CallbackContext, CommandHandler
 import os
+from bot import ask_bot
 from db import psql_db
 import config
-import ollama
 
 logger = config.logger
+
+BOT_NAME = "ckb-tgbot"
 
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("Hello! I'm CKB agent!\nI will help you do KYC on telegram. Please ask me anything.")
@@ -42,22 +44,11 @@ async def new_member_handler(update: Update, context: CallbackContext):
 async def handle_direct_message(update: Update, context: CallbackContext):
     """Handle direct messages from users."""
     if update.message.chat.type == "private":
+        user = update.message.from_user
         message = update.message.text
         # Send a response when receiving a direct message
-        response = ollama.chat(
-            model=os.environ['MODEL_URL'],
-            messages=[
-                {
-                    'role': 'system',
-                    'content': "you are CKB agent help the user do their KYC. The information need to be collected are date of birth, CKB address. The user's CKB also needed to hold portion of amount of CKB."
-                },
-                {
-                    'role': 'user',
-                    'content': message
-                },
-            ]
-        )
-        await update.message.reply_text(response.message.content)
+        reply = ask_bot(message, BOT_NAME, user)
+        await update.message.reply_text(reply)
 
 def main() -> None:
     # Create the Application and pass in the bot's token
