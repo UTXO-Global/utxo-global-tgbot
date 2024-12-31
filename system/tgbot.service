@@ -1,0 +1,11 @@
+[Unit]
+Description=Coti Agent TGBot
+After=network.target
+
+[Service]
+WorkingDirectory=/home/ubuntu/ac-ai-model
+Environment="PATH=/home/ubuntu/ac-ai-model/pyenv/bin"
+ExecStart=/home/ubuntu/ac-ai-model/pyenv/bin/python tgbot.py
+
+[Install]
+WantedBy=multi-user.target

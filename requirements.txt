@@ -1,0 +1,10 @@
+torch
+transformers
+python-dotenv
+accelerate>=0.26.0
+psycopg2-binary
+flask
+python-telegram-bot
+requests
+flask_restx
+ollama
