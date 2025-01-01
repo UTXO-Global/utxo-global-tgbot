@@ -2,7 +2,7 @@
 name = "utxo-global-tgbot-api"
 version = "0.1.0"
 edition = "2021"
-# default-run = "app"
+default-run = "api"
 
 [dependencies]
 actix-cors = "0.7.0"
@@ -33,3 +33,4 @@ uuid = { version = "1.11.0", features = [
 tokio-pg-mapper = { version = "0.2.0", features = ["tokio-pg-mapper-derive"] }
 tokio-pg-mapper-derive = "0.2.0"
 pg_bigdecimal = { version = "0.1.5", features = ["serde"] }
+tokio = "1.42.0"
