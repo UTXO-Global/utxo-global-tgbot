@@ -1,6 +1,0 @@
-python-dotenv
-psycopg2-binary
-flask
-python-telegram-bot
-requests
-flask_restx
