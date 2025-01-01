@@ -8,6 +8,7 @@ use utxo_global_tgbot_api::{config, repositories};
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
     let db = &DB_POOL.clone();
     let member_dao = Arc::new(repositories::member::MemberDao::new(db.clone()));
     let bot_name: Arc<String> = Arc::new(config::get("bot_name"));

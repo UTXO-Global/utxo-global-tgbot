@@ -15,6 +15,7 @@ pub fn init_routes(cfg: &mut web::ServiceConfig) {
 }
 
 pub async fn create_app() -> std::io::Result<()> {
+    env_logger::init();
     // Init DB
     let db = &DB_POOL.clone();
 
