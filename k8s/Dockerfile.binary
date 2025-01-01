@@ -1,0 +1,18 @@
+######################
+#### Running stage
+######################
+FROM ubuntu:24.04 as runtime
+
+RUN apt update && apt install curl tzdata libpq5 libc6 -y
+
+WORKDIR /srv
+COPY ./target/x86_64-unknown-linux-musl/release/api ./
+COPY ./target/x86_64-unknown-linux-musl/release/chatbot ./
+COPY ./config.toml ./
+RUN chmod 550 api
+RUN chmod 550 chatbot
+
+ENV TZ=Asia/Ho_Chi_Minh \
+    RUST_LOG=info
+
+ENTRYPOINT [ "/srv/api" ]

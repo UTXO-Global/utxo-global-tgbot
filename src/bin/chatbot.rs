@@ -25,11 +25,9 @@ async fn main() {
 
     // Create an update handler
     teloxide::repl(bot, {
-        // Clone `Arc` ngoài closure
         let member_dao = Arc::clone(&member_dao);
         let bot_name = Arc::clone(&bot_name);
         move |bot: Bot, message: Message| {
-            // Clone `Arc` bên trong async block để có thể sử dụng trong nhiều lần gọi
             let member_dao = Arc::clone(&member_dao);
             let bot_name = Arc::clone(&bot_name);
             async move {
