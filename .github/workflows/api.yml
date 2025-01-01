@@ -4,6 +4,10 @@ on:
   push:
     branches: [staging, prod]
 
+defaults:
+  run:
+    working-directory: ./api
+
 env:
   CURRENT_SERVICE: ${{ github.event.repository.name }}-api
   AWS_ECR_URI: 604313529175.dkr.ecr.ap-southeast-1.amazonaws.com
@@ -17,12 +21,6 @@ jobs:
     name: Build And Publish
     runs-on: ubuntu-latest
     steps:
-      - name: Run a script in a api directory
-        run: |
-          echo "Running in the api directory"
-          ls
-        working-directory: ./api
-
       - uses: actions/checkout@v2
 
       - uses: actions-rs/toolchain@v1
