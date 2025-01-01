@@ -3,7 +3,7 @@ use std::sync::Arc;
 use teloxide::prelude::*;
 use teloxide::types::{ChatKind, MessageKind};
 use utxo_global_tgbot_api::repositories::chatbot::ask_bot;
-use utxo_global_tgbot_api::repositories::db::DB_POOL;
+use utxo_global_tgbot_api::repositories::db::{migrate_db, DB_POOL};
 use utxo_global_tgbot_api::{config, repositories};
 
 #[tokio::main]
@@ -13,8 +13,14 @@ async fn main() {
     let bot_name: Arc<String> = Arc::new(config::get("bot_name"));
     let bot_token: String = config::get("bot_token");
 
+    // migrate db
+    if let Err(e) = migrate_db().await {
+        println!("\nMigrate db failed: {}", e);
+    }
+
     // Initialize the bot
     let bot = Bot::new(bot_token);
+    log::info!("Start TGBot");
 
     // Create an update handler
     teloxide::repl(bot, {
@@ -55,7 +61,7 @@ async fn main() {
                             // Insert new member
                             if let Err(err) = member_dao.insert_member(tgid.0 as i64, tgname).await
                             {
-                                log::error!("{:?}", err);
+                                log::error!("insert new member failed: {:?}", err);
                             }
                         } else {
                             log::error!("Could not message {tgname} (ID: {tgid})");
@@ -70,7 +76,9 @@ async fn main() {
 
                             let response =
                                 ask_bot(text, bot_name.as_str(), tgid.to_string().as_str());
-                            bot.send_message(message.chat.id, response).await?;
+                            if let Err(error) = bot.send_message(message.chat.id, response).await {
+                                log::error!("Reply private message: {:?}", error);
+                            };
                         }
                     }
                 }
