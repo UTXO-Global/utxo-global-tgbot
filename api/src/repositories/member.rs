@@ -31,4 +31,15 @@ impl MemberDao {
             .await?;
         Ok(())
     }
+
+    pub async fn insert_member(&self, tgid: i64, tgname: String) -> Result<(), PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt =
+            "INSERT INTO members (tgid, tgname) VALUES ($1, $2) ON CONFLICT (tgid) DO NOTHING ;";
+        let stmt = client.prepare(_stmt).await?;
+
+        client.execute(&stmt, &[&tgid, &tgname]).await?;
+        Ok(())
+    }
 }
