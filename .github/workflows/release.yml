@@ -5,7 +5,7 @@ on:
     branches: [staging, prod]
 
 env:
-  CURRENT_SERVICE: ${{ github.event.repository.name }}-api
+  CURRENT_SERVICE: ${{ github.event.repository.name }}
   AWS_ECR_URI: 604313529175.dkr.ecr.ap-southeast-1.amazonaws.com
   NAMESPACE: ${{ github.ref_name }}
   ZONE: ap-southeast-1
