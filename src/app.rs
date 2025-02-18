@@ -24,7 +24,11 @@ pub async fn create_app() -> std::io::Result<()> {
         println!("\nMigrate db failed: {}", e);
     }
     let member_dao = repositories::member::MemberDao::new(db.clone());
-    let member_service = web::Data::new(services::member::MemberSrv::new(member_dao.clone()));
+    let tele_dao = repositories::telegram::TelegramDao::new(db.clone());
+    let member_service = web::Data::new(services::member::MemberSrv::new(
+        member_dao.clone(),
+        tele_dao.clone(),
+    ));
 
     let listen_address: String = config::get("listen_address");
 
