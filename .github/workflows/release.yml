@@ -6,11 +6,10 @@ on:
 
 env:
   CURRENT_SERVICE: ${{ github.event.repository.name }}
-  AWS_ECR_URI: 604313529175.dkr.ecr.ap-southeast-1.amazonaws.com
+  PROJECT_ID: fewcha-450202
+  REGION: us-central1
+  GKE_CLUSTER: fewcha-gke
   NAMESPACE: ${{ github.ref_name }}
-  ZONE: ap-southeast-1
-  CLUSTER_NAME: fewcha_remake
-  AWS_ACCOUNT_ID: 604313529175
 
 jobs:
   build_and_publish:
