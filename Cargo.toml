@@ -10,6 +10,8 @@ actix-web = "4.9.0"
 chrono = { version = "0.4.39", features = ["serde"] }
 ckb-hash = "0.120.0"
 ckb-sdk = "3.4.1"
+ckb-types = "0.118.0"
+ckb-jsonrpc-types = "0.118.0"
 config = "0.15.4"
 deadpool-postgres = { version = "0.14.1", features = ["serde"] }
 dotenv = "0.15.0"
