@@ -37,8 +37,7 @@ async fn main() {
             async move {
                 let chat = message.chat.clone();
                 
-
-                if chat.is_group() || !chat.is_supergroup(){
+                if chat.is_group() || chat.is_supergroup(){
                     let chat_title = match chat.kind {
                         teloxide::types::ChatKind::Public(chat_public) => &chat_public.title.unwrap_or("".to_string()),
                         teloxide::types::ChatKind::Private(chat_private) =>  &chat_private.first_name.unwrap_or("".to_string()),
