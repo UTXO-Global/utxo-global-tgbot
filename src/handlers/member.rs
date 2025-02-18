@@ -11,7 +11,7 @@ async fn verify(
     req: web::Json<VerifyMemberReq>,
 ) -> Result<HttpResponse, AppError> {
     member_srv.verify_signature(req.clone()).await?;
-    // TODO: load balance
+
     let balance = pg_bigdecimal::PgNumeric::new(Some(BigDecimal::from(0)));
     member_srv
         .update_member(req.tgid, req.ckb_address.clone(), balance, req.dob, 1)
