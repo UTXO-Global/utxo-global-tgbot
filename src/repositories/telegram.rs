@@ -131,7 +131,7 @@ impl TelegramDao {
     pub async fn get_member(
         &self,
         chat_id: String,
-        user_id: String,
+        user_id: i64,
     ) -> Result<Option<TelegramGroupJoined>, PoolError> {
         let client: Client = self.db.get().await?;
 

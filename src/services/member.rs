@@ -97,7 +97,7 @@ impl MemberSrv {
         {
             Ok(groups) => {
                 let balances = get_balances(req.ckb_address).await;
-                let age = self.calc_age(req.dob.clone());
+                let age = self.calc_age(req.dob);
                 let bot_token: String = config::get("bot_token");
                 let bot = Bot::new(bot_token);
                 for group in groups {
@@ -152,11 +152,7 @@ impl MemberSrv {
 
                         let _ = self
                             .tele_dao
-                            .update_mmember(
-                                group.chat_id.clone(),
-                                group.user_id.clone(),
-                                MEMBER_STATUS_REJECT,
-                            )
+                            .update_mmember(group.chat_id, group.user_id, MEMBER_STATUS_REJECT)
                             .await;
                     }
                 }
@@ -188,6 +184,6 @@ impl MemberSrv {
             age -= 1i32;
         }
 
-        return age;
+        age
     }
 }

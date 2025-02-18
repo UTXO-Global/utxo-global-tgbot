@@ -5,20 +5,11 @@ use chrono::Utc;
 use teloxide::dispatching::dialogue::GetChatId;
 use teloxide::prelude::*;
 use teloxide::types::{
-    ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, MessageKind, ParseMode
+    ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, MessageKind, ParseMode
 };
-use utxo_global_tgbot_api::models::telegram::{TelegramGroup, TelegramGroupJoined};
+use utxo_global_tgbot_api::models::telegram::{TelegramGroup, TelegramGroupJoined, MEMBER_STATUS_PENDING};
 use utxo_global_tgbot_api::repositories::db::{migrate_db, DB_POOL};
 use utxo_global_tgbot_api::{config, repositories};
-
-async fn is_admin(bot: &Bot, chat_id: ChatId, user_id: UserId) -> bool {
-    match bot.get_chat_member(chat_id, user_id).await {
-        Ok(chat_member) => {
-            matches!(chat_member.status(), ChatMemberStatus::Administrator | ChatMemberStatus::Owner)
-        }
-        Err(_) => false,
-    }
-}
 
 #[tokio::main]
 async fn main() {
@@ -45,16 +36,12 @@ async fn main() {
             let member_dao = Arc::clone(&member_dao);
             async move {
                 let chat = message.chat.clone();
-                let text = message.text().clone().unwrap_or("");
-                let bot_id = message.from.clone().map(|u| u.id).unwrap();
                 let chat_title = match chat.kind {
                     teloxide::types::ChatKind::Public(chat_public) => &chat_public.title.unwrap_or("".to_string()),
                     teloxide::types::ChatKind::Private(chat_private) =>  &chat_private.first_name.unwrap_or("".to_string()),
                 }; 
-
-                println!("Got message {:?}", message);
                 
-                let res = telegram_dao.add_group(TelegramGroup{ 
+                let _ = telegram_dao.add_group(TelegramGroup{ 
                     chat_id: chat.id.to_string(), 
                     name: chat_title.to_string(), 
                     status: 1, 
@@ -63,29 +50,6 @@ async fn main() {
                     min_approve_age: Some(18), 
                     created_at: Utc::now().naive_utc(), 
                     updated_at: Utc::now().naive_utc() }).await;
-
-                println!("{:?}", res);
-
-                if text.starts_with("/") {
-                    match text.split_whitespace().collect::<Vec<&str>>().as_slice() {
-                        ["/approved", user_id_str] => {
-                            if is_admin(&bot, chat.id, bot_id).await {
-                                if let Ok(user_id) = user_id_str.parse::<u64>() {
-                                
-                                    let permissions = ChatPermissions::all();
-                                    println!("{:?}", permissions);
-                                    let _ = bot.restrict_chat_member(chat.id, UserId(user_id), permissions)
-                                        .await;
-        
-                                    bot.send_message(chat.id, format!("✅ User {} approved!", UserId(user_id)))
-                                        .await
-                                        .unwrap();
-                                }
-                            }
-                        },
-                        _ => {}
-                    }
-                }
 
                 // Handle new chat members
                 if let MessageKind::NewChatMembers(msg) = &message.clone().kind {
@@ -123,17 +87,19 @@ async fn main() {
                                 log::error!("insert new member failed: {:?}", err);
                             }
 
-                            let res = telegram_dao.add_member(TelegramGroupJoined{
-                                chat_id: chat.id.to_string(), 
-                                user_id: tgid.0 as i64,
-                                user_name: tgname.clone(), 
-                                status: 0, 
-                                created_at: Utc::now().naive_utc(), 
-                                updated_at: Utc::now().naive_utc() 
-                            }).await;
-
-                            println!("{:?}", res);
-
+                            let member_joined =telegram_dao.get_member(chat.id.to_string(), tgid.0 as i64).await.unwrap();
+                            if member_joined.is_none() {
+                                let _ = telegram_dao.add_member(TelegramGroupJoined{
+                                    chat_id: chat.id.to_string(), 
+                                    user_id: tgid.0 as i64,
+                                    user_name: tgname.clone(), 
+                                    status: 0, 
+                                    created_at: Utc::now().naive_utc(), 
+                                    updated_at: Utc::now().naive_utc() 
+                                }).await;
+                            } else {
+                                let _ = telegram_dao.update_mmember(chat.id.to_string(), tgid.0 as i64, MEMBER_STATUS_PENDING).await;
+                            }
                         }
                     }
                 }
