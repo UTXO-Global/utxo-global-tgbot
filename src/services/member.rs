@@ -139,16 +139,16 @@ impl MemberSrv {
                             "Insufficient balance(Min: 150 KCB)"
                         };
 
-                        bot.send_message(
-                            group.clone().chat_id.to_string(),
-                            format!(
-                                "⚠️ User {} banned! \nReason: {}",
-                                group.clone().user_name,
-                                reason
-                            ),
-                        )
-                        .await
-                        .unwrap();
+                        let _ = bot
+                            .send_message(
+                                group.clone().chat_id.to_string(),
+                                format!(
+                                    "⚠️ User {} banned! \nReason: {}",
+                                    group.clone().user_name,
+                                    reason
+                                ),
+                            )
+                            .await;
 
                         let _ = self
                             .tele_dao
