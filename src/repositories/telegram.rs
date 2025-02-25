@@ -58,20 +58,23 @@ impl TelegramDao {
         Ok(member)
     }
 
-    pub async fn update_group(
-        &self,
-        chat_id: String,
-        min_approve_token: i64,
-        min_approve_balance: i64,
-    ) -> Result<bool, PoolError> {
+    pub async fn update_group(&self, group: &TelegramGroup) -> Result<bool, PoolError> {
         let client: Client = self.db.get().await?;
 
         let _stmt =
-            "UPDATE tg_groups SET min_approve_balance=$1, min_approve_balance=$2 WHERE chat_id=$3;";
+            "UPDATE tg_groups SET token_address=$1, min_approve_balance=$2, min_approve_age=$3 WHERE chat_id=$4;";
         let stmt = client.prepare(_stmt).await?;
 
         let affected_rows = client
-            .execute(&stmt, &[&chat_id, &min_approve_token, &min_approve_balance])
+            .execute(
+                &stmt,
+                &[
+                    &group.token_address,
+                    &group.min_approve_balance,
+                    &group.min_approve_age,
+                    &group.chat_id,
+                ],
+            )
             .await?;
 
         Ok(affected_rows > 0)

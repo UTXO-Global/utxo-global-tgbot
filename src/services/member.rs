@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
 use chrono::{Datelike, NaiveDate, Utc};
 use ckb_hash::{Blake2bBuilder, CKB_HASH_PERSONALIZATION};
@@ -16,7 +16,9 @@ use teloxide::{
 
 use crate::{
     config,
-    models::telegram::{MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT},
+    models::telegram::{
+        TelegramGroup, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT,
+    },
     repositories::{
         ckb::{get_balances, get_ckb_network},
         member::MemberDao,
@@ -90,61 +92,102 @@ impl MemberSrv {
     }
 
     pub async fn verify_info(&self, req: VerifyMemberReq) {
+        let mut groups: HashMap<String, TelegramGroup> = HashMap::new();
         match self
             .tele_dao
             .get_group_by_user_id(req.tgid, Some(MEMBER_STATUS_PENDING))
             .await
         {
-            Ok(groups) => {
+            Ok(joined_groups) => {
                 let balances = get_balances(req.ckb_address).await;
                 let age = self.calc_age(req.dob);
                 let bot_token: String = config::get("bot_token");
                 let bot = Bot::new(bot_token);
-                for group in groups {
-                    if group.status == MEMBER_STATUS_ACCEPTED {
+                for member in joined_groups {
+                    println!("member {:?}", member);
+                    if member.status == MEMBER_STATUS_ACCEPTED {
                         continue;
                     }
 
-                    let balance = balances.get("CKB").and_then(Value::as_u64).unwrap_or(0);
-                    if balance > 150 && age > 17 {
-                        // from 18 age above
+                    let group: Option<TelegramGroup> = if let Some(existing_group) =
+                        groups.get(&member.chat_id)
+                    {
+                        Some(existing_group.clone())
+                    } else {
+                        match self.tele_dao.get_group(member.chat_id.clone()).await {
+                            Ok(fetched_group) => {
+                                groups
+                                    .insert(member.chat_id.clone(), fetched_group.clone().unwrap());
+                                fetched_group
+                            }
+                            Err(_) => None,
+                        }
+                    };
+
+                    if group.is_none() {
+                        println!("Group {} not existed", member.chat_id);
+                        continue;
+                    }
+
+                    let group_unwrap = group.clone().unwrap();
+                    let min_age_approved = group_unwrap.min_approve_age.clone().unwrap_or(0);
+                    let min_balance_approved =
+                        group_unwrap.min_approve_balance.clone().unwrap_or(0) as f64;
+                    let token_address = group_unwrap
+                        .token_address
+                        .clone()
+                        .unwrap_or("CKB".to_owned());
+
+                    let balance = balances
+                        .get(token_address)
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.0);
+
+                    if balance >= min_balance_approved && age >= min_age_approved.clone() {
                         let _ = bot
                             .restrict_chat_member(
-                                group.clone().chat_id.to_string(),
-                                UserId(group.clone().user_id as u64),
+                                member.clone().chat_id.to_string(),
+                                UserId(member.clone().user_id as u64),
                                 ChatPermissions::all(),
                             )
                             .await;
                         bot.send_message(
-                            group.clone().chat_id.to_string(),
-                            format!("✅ User {} approved!", group.clone().user_name),
+                            member.clone().chat_id.to_string(),
+                            format!("✅ User {} approved!", member.clone().user_name),
                         )
                         .await
                         .unwrap();
                         let _ = self
                             .tele_dao
-                            .update_mmember(group.chat_id, group.user_id, MEMBER_STATUS_ACCEPTED)
+                            .update_mmember(member.chat_id, member.user_id, MEMBER_STATUS_ACCEPTED)
                             .await;
                     } else {
                         let _ = bot
                             .ban_chat_member(
-                                group.clone().chat_id.to_string(),
-                                UserId(group.clone().user_id as u64),
+                                member.clone().chat_id.to_string(),
+                                UserId(member.clone().user_id as u64),
                             )
                             .await;
 
-                        let reason = if age < 18 {
-                            "Under 18 years odl"
+                        let reason = if age < min_age_approved.clone() {
+                            format!("Under {} years odl", min_age_approved.clone())
                         } else {
-                            "Insufficient balance(Min: 150 KCB)"
+                            format!(
+                                "Insufficient balance(Min: {} {})",
+                                min_balance_approved.clone(),
+                                group_unwrap
+                                    .token_address
+                                    .clone()
+                                    .unwrap_or("CKB".to_string())
+                            )
                         };
 
                         let _ = bot
                             .send_message(
-                                group.clone().chat_id.to_string(),
+                                member.clone().chat_id.to_string(),
                                 format!(
                                     "⚠️ User {} banned! \nReason: {}",
-                                    group.clone().user_name,
+                                    member.clone().user_name,
                                     reason
                                 ),
                             )
@@ -152,7 +195,7 @@ impl MemberSrv {
 
                         let _ = self
                             .tele_dao
-                            .update_mmember(group.chat_id, group.user_id, MEMBER_STATUS_REJECT)
+                            .update_mmember(member.chat_id, member.user_id, MEMBER_STATUS_REJECT)
                             .await;
                     }
                 }
