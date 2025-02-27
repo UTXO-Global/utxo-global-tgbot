@@ -2,10 +2,10 @@ use std::{str::FromStr, sync::Arc};
 
 use chrono::{Utc};
 use teloxide::{
-    dispatching::dialogue::GetChatId, payloads::SendMessageSetters, prelude::*, types::{Chat, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
+    dispatching::dialogue::GetChatId, payloads::{BanChatMemberSetters, SendMessageSetters}, prelude::*, types::{Chat, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
 
-use crate::{config::{self, MEMBER_KYC_EXPIRED_TIME}, models::telegram::{TelegramGroup, TelegramGroupJoined, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, repositories::{member::MemberDao, telegram::TelegramDao}};
+use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::telegram::{TelegramGroup, TelegramGroupJoined, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, repositories::{member::MemberDao, telegram::TelegramDao}};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -110,7 +110,7 @@ impl TelegramService {
                     }
 
                     let member_joined =self.tele_dao.get_member(chat.id.to_string(), tgid.0 as i64).await.unwrap();
-                    let expired = Utc::now().naive_utc() + MEMBER_KYC_EXPIRED_TIME;
+                    let expired = Utc::now().naive_utc() + MEMBER_KYC_DURATION;
                     if member_joined.is_none() {
                         let _ = self.tele_dao.add_member(TelegramGroupJoined{
                             chat_id: chat.id.to_string(), 
@@ -200,13 +200,14 @@ impl TelegramService {
     }
 
     pub async fn cron_auto_kick_member(&self) {
-         if let Ok(members) = self.tele_dao.get_member_not_kyc().await {
+        if let Ok(members) = self.tele_dao.get_member_not_kyc().await {
+            let until_date = Utc::now() + MEMBER_BAN_DURATION;
             for member in members {
                 let _ = self.bot
                         .ban_chat_member(
                             member.clone().chat_id.to_string(),
                             UserId(member.clone().user_id as u64),
-                        )
+                        ).until_date(until_date)
                         .await;
 
                     let _ = self.bot

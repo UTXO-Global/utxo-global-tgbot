@@ -9,13 +9,14 @@ use secp256k1::{
 };
 use serde_json::Value;
 use teloxide::{
+    payloads::BanChatMemberSetters,
     prelude::Requester,
     types::{ChatPermissions, UserId},
     Bot,
 };
 
 use crate::{
-    config,
+    config::{self, MEMBER_BAN_DURATION},
     models::telegram::{
         TelegramGroup, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT,
     },
@@ -167,11 +168,13 @@ impl MemberSrv {
                             )
                             .await;
                     } else {
+                        let until_date = Utc::now() + MEMBER_BAN_DURATION;
                         let _ = bot
                             .ban_chat_member(
                                 member.clone().chat_id.to_string(),
                                 UserId(member.clone().user_id as u64),
                             )
+                            .until_date(until_date)
                             .await;
 
                         let reason = if age < min_age_approved {
