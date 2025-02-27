@@ -117,12 +117,12 @@ impl TelegramService {
                             user_id: tgid.0 as i64,
                             user_name: tgname.clone(), 
                             status: 0, 
-                            expired: expired.clone(),
+                            expired,
                             created_at: Utc::now().naive_utc(), 
                             updated_at: Utc::now().naive_utc() 
                         }).await;
                     } else {
-                        let _ = self.tele_dao.update_mmember(chat.id.to_string(), tgid.0 as i64, expired.clone(), MEMBER_STATUS_PENDING).await;
+                        let _ = self.tele_dao.update_mmember(chat.id.to_string(), tgid.0 as i64, expired, MEMBER_STATUS_PENDING).await;
                     }
                 }
             }
@@ -143,7 +143,7 @@ impl TelegramService {
                         group.token_address = Some(token);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
                 CommandType::SetAmount(amount) => {
@@ -151,7 +151,7 @@ impl TelegramService {
                         group.min_approve_balance = Some(amount);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
                 CommandType::SetAge(age) => {
@@ -159,7 +159,7 @@ impl TelegramService {
                         group.min_approve_age = Some(age);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
             }
@@ -200,33 +200,30 @@ impl TelegramService {
     }
 
     pub async fn cron_auto_kick_member(&self) {
-         match self.tele_dao.get_member_not_kyc().await {
-            Ok(members) => {
-                for member in members {
+         if let Ok(members) = self.tele_dao.get_member_not_kyc().await {
+            for member in members {
+                let _ = self.bot
+                        .ban_chat_member(
+                            member.clone().chat_id.to_string(),
+                            UserId(member.clone().user_id as u64),
+                        )
+                        .await;
+
                     let _ = self.bot
-                            .ban_chat_member(
-                                member.clone().chat_id.to_string(),
-                                UserId(member.clone().user_id as u64),
-                            )
-                            .await;
+                        .send_message(
+                            member.clone().chat_id.to_string(),
+                            format!(
+                                "⚠️ User {} banned! \nReason: did not complete verification within 3 minutes",
+                                member.clone().user_name,
+                            ),
+                        )
+                        .await;
 
-                        let _ = self.bot
-                            .send_message(
-                                member.clone().chat_id.to_string(),
-                                format!(
-                                    "⚠️ User {} banned! \nReason: did not complete verification within 3 minutes",
-                                    member.clone().user_name,
-                                ),
-                            )
-                            .await;
-
-                        let _ = self
-                            .tele_dao
-                            .update_mmember(member.chat_id, member.user_id, member.expired, MEMBER_STATUS_REJECT)
-                            .await;
-                }
-            },
-            Err(_) => {},
+                    let _ = self
+                        .tele_dao
+                        .update_mmember(member.chat_id, member.user_id, member.expired, MEMBER_STATUS_REJECT)
+                        .await;
+            }
         }
     }
 }

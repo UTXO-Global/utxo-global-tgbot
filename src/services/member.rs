@@ -130,12 +130,12 @@ impl MemberSrv {
                     }
 
                     let group_unwrap = group.clone().unwrap();
-                    let min_age_approved = group_unwrap.min_approve_age.clone().unwrap_or(0);
+                    let min_age_approved = group_unwrap.clone().min_approve_age.unwrap_or(0);
                     let min_balance_approved =
-                        group_unwrap.min_approve_balance.clone().unwrap_or(0) as f64;
+                        group_unwrap.clone().min_approve_balance.unwrap_or(0) as f64;
                     let token_address = group_unwrap
-                        .token_address
                         .clone()
+                        .token_address
                         .unwrap_or("CKB".to_owned());
 
                     let balance = balances
@@ -143,7 +143,7 @@ impl MemberSrv {
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
 
-                    if balance >= min_balance_approved && age >= min_age_approved.clone() {
+                    if balance >= min_balance_approved && age >= min_age_approved {
                         let _ = bot
                             .restrict_chat_member(
                                 member.clone().chat_id.to_string(),
@@ -174,15 +174,15 @@ impl MemberSrv {
                             )
                             .await;
 
-                        let reason = if age < min_age_approved.clone() {
-                            format!("Under {} years odl", min_age_approved.clone())
+                        let reason = if age < min_age_approved {
+                            format!("Under {} years odl", min_age_approved)
                         } else {
                             format!(
                                 "Insufficient balance(Min: {} {})",
                                 min_balance_approved.clone(),
                                 group_unwrap
-                                    .token_address
                                     .clone()
+                                    .token_address
                                     .unwrap_or("CKB".to_string())
                             )
                         };

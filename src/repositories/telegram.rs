@@ -158,7 +158,7 @@ impl TelegramDao {
             .query(&stmt, &[])
             .await?
             .iter()
-            .map(|row| TelegramGroupJoined::from_row_ref(&row).unwrap())
+            .map(|row| TelegramGroupJoined::from_row_ref(row).unwrap())
             .collect::<Vec<TelegramGroupJoined>>();
         Ok(rows)
     }
