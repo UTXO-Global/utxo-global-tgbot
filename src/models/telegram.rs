@@ -36,6 +36,7 @@ pub struct TelegramGroupJoined {
     pub user_id: i64,
     pub user_name: String,
     pub status: i16,
+    pub expired: NaiveDateTime,
 
     #[serde(skip_serializing)]
     pub created_at: NaiveDateTime,

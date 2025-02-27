@@ -1,3 +1,4 @@
+use chrono::{Duration, TimeDelta};
 use config::Config;
 use dotenv::dotenv;
 use once_cell::sync::Lazy;
@@ -13,3 +14,5 @@ pub static CONFIG: Lazy<Config> = Lazy::new(|| {
 pub fn get<'a, T: serde::Deserialize<'a>>(key: &str) -> T {
     CONFIG.get::<T>(key).unwrap()
 }
+
+pub static MEMBER_KYC_EXPIRED_TIME: TimeDelta = Duration::minutes(3);

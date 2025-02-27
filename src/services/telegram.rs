@@ -1,11 +1,11 @@
 use std::{str::FromStr, sync::Arc};
 
-use chrono::Utc;
+use chrono::{Utc};
 use teloxide::{
     dispatching::dialogue::GetChatId, payloads::SendMessageSetters, prelude::*, types::{Chat, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
 
-use crate::{config, models::telegram::{TelegramGroup, TelegramGroupJoined, MEMBER_STATUS_PENDING}, repositories::{member::MemberDao, telegram::TelegramDao}};
+use crate::{config::{self, MEMBER_KYC_EXPIRED_TIME}, models::telegram::{TelegramGroup, TelegramGroupJoined, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, repositories::{member::MemberDao, telegram::TelegramDao}};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -53,11 +53,9 @@ impl TelegramService {
         let chat = message.chat.clone();
                 
         let text = message.text().unwrap_or("");
-        println!("{:?} {:?}", text, message.kind.clone());
+
         // Handle new chat members
-        
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
-            println!("NewChatMembers here!");
             let chat_title = match chat.kind {
                 teloxide::types::ChatKind::Public(chat_public) => &chat_public.title.unwrap_or("".to_string()),
                 teloxide::types::ChatKind::Private(chat_private) =>  &chat_private.first_name.unwrap_or("".to_string()),
@@ -112,17 +110,19 @@ impl TelegramService {
                     }
 
                     let member_joined =self.tele_dao.get_member(chat.id.to_string(), tgid.0 as i64).await.unwrap();
+                    let expired = Utc::now().naive_utc() + MEMBER_KYC_EXPIRED_TIME;
                     if member_joined.is_none() {
                         let _ = self.tele_dao.add_member(TelegramGroupJoined{
                             chat_id: chat.id.to_string(), 
                             user_id: tgid.0 as i64,
                             user_name: tgname.clone(), 
                             status: 0, 
+                            expired,
                             created_at: Utc::now().naive_utc(), 
                             updated_at: Utc::now().naive_utc() 
                         }).await;
                     } else {
-                        let _ = self.tele_dao.update_mmember(chat.id.to_string(), tgid.0 as i64, MEMBER_STATUS_PENDING).await;
+                        let _ = self.tele_dao.update_mmember(chat.id.to_string(), tgid.0 as i64, expired, MEMBER_STATUS_PENDING).await;
                     }
                 }
             }
@@ -143,7 +143,7 @@ impl TelegramService {
                         group.token_address = Some(token);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
                 CommandType::SetAmount(amount) => {
@@ -151,7 +151,7 @@ impl TelegramService {
                         group.min_approve_balance = Some(amount);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
                 CommandType::SetAge(age) => {
@@ -159,7 +159,7 @@ impl TelegramService {
                         group.min_approve_age = Some(age);
                         let _ = self.tele_dao.update_group(&group).await;
                     } else {
-                        let _ = bot.delete_message(chat.id.clone(), message.id.clone()).await;
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 }
             }
@@ -197,5 +197,33 @@ impl TelegramService {
             }
         }
         false
+    }
+
+    pub async fn cron_auto_kick_member(&self) {
+         if let Ok(members) = self.tele_dao.get_member_not_kyc().await {
+            for member in members {
+                let _ = self.bot
+                        .ban_chat_member(
+                            member.clone().chat_id.to_string(),
+                            UserId(member.clone().user_id as u64),
+                        )
+                        .await;
+
+                    let _ = self.bot
+                        .send_message(
+                            member.clone().chat_id.to_string(),
+                            format!(
+                                "⚠️ User {} banned! \nReason: did not complete verification within 3 minutes",
+                                member.clone().user_name,
+                            ),
+                        )
+                        .await;
+
+                    let _ = self
+                        .tele_dao
+                        .update_mmember(member.chat_id, member.user_id, member.expired, MEMBER_STATUS_REJECT)
+                        .await;
+            }
+        }
     }
 }
