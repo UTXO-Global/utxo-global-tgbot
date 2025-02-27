@@ -8,6 +8,7 @@ RUN apt update && apt install curl tzdata libpq5 libc6 -y
 WORKDIR /srv
 COPY ./target/release/api ./
 COPY ./target/release/chatbot ./
+COPY ./target/release/cron ./
 COPY ./config.toml ./
 RUN chmod 550 api
 RUN chmod 550 chatbot
