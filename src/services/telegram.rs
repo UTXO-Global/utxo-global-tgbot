@@ -86,7 +86,7 @@ impl TelegramService {
                 let kyc_link: String = config::get("kyc_link");
                 let keyboard =
                         InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::url(
-                            "KYC Form",
+                            "Visit",
                             reqwest::Url::from_str(kyc_link.as_str()).unwrap(),
                         )]]);
                 // handle error
@@ -94,7 +94,8 @@ impl TelegramService {
                     .send_message(
                         message.chat_id().unwrap(),
                         format!(
-                            "Hello @{tgname}, welcome to the group! 👋\nPlease complete your KYC to get started.\n"
+                            "Hello @{tgname}, welcome to the group! 👋\nPlease complete your information to get started.\n"
+
                         ),
                     ).parse_mode(ParseMode::Html)
                     .reply_markup(keyboard)
