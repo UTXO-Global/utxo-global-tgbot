@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use chrono::NaiveDateTime;
 use deadpool_postgres::{Client, Pool, PoolError};
 use tokio_pg_mapper::FromTokioPostgresRow;
 
@@ -84,15 +85,17 @@ impl TelegramDao {
         &self,
         chat_id: String,
         user_id: i64,
+        expired: NaiveDateTime,
         status: i16,
     ) -> Result<bool, PoolError> {
         let client: Client = self.db.get().await?;
 
-        let _stmt = "UPDATE tg_group_joined SET status=$1 WHERE chat_id=$2 AND user_id=$3";
+        let _stmt =
+            "UPDATE tg_group_joined SET status=$1, expired=$2 WHERE chat_id=$3 AND user_id=$4";
         let stmt = client.prepare(_stmt).await?;
 
         let affected_rows = client
-            .execute(&stmt, &[&status, &chat_id, &user_id])
+            .execute(&stmt, &[&status, &expired, &chat_id, &user_id])
             .await?;
 
         Ok(affected_rows > 0)
@@ -143,5 +146,20 @@ impl TelegramDao {
 
         let row = client.query(&stmt, &[&chat_id, &user_id]).await?.pop();
         Ok(row.map(|row| TelegramGroupJoined::from_row_ref(&row).unwrap()))
+    }
+
+    pub async fn get_member_not_kyc(&self) -> Result<Vec<TelegramGroupJoined>, PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt = "SELECT * FROM tg_group_joined WHERE NOW() > expired AND status = 0";
+        let stmt = client.prepare(_stmt).await?;
+
+        let rows = client
+            .query(&stmt, &[])
+            .await?
+            .iter()
+            .map(|row| TelegramGroupJoined::from_row_ref(&row).unwrap())
+            .collect::<Vec<TelegramGroupJoined>>();
+        Ok(rows)
     }
 }

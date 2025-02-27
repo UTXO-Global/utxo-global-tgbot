@@ -159,7 +159,12 @@ impl MemberSrv {
                         .unwrap();
                         let _ = self
                             .tele_dao
-                            .update_mmember(member.chat_id, member.user_id, MEMBER_STATUS_ACCEPTED)
+                            .update_mmember(
+                                member.chat_id,
+                                member.user_id,
+                                member.expired,
+                                MEMBER_STATUS_ACCEPTED,
+                            )
                             .await;
                     } else {
                         let _ = bot
@@ -195,7 +200,12 @@ impl MemberSrv {
 
                         let _ = self
                             .tele_dao
-                            .update_mmember(member.chat_id, member.user_id, MEMBER_STATUS_REJECT)
+                            .update_mmember(
+                                member.chat_id,
+                                member.user_id,
+                                member.expired,
+                                MEMBER_STATUS_REJECT,
+                            )
                             .await;
                     }
                 }

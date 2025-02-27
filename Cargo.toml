@@ -50,3 +50,7 @@ path = "src/bin/chatbot.rs"
 [[bin]]
 name = "api"
 path = "src/bin/api.rs"
+
+[[bin]]
+name = "cron"
+path = "src/bin/cron.rs"
