@@ -11,6 +11,7 @@ COPY ./target/release/chatbot ./
 COPY ./config.toml ./
 RUN chmod 550 api
 RUN chmod 550 chatbot
+RUN chmod 550 cron
 
 ENV TZ=Asia/Ho_Chi_Minh \
     RUST_LOG=info
