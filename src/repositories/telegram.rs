@@ -151,7 +151,7 @@ impl TelegramDao {
     pub async fn get_member_not_kyc(&self) -> Result<Vec<TelegramGroupJoined>, PoolError> {
         let client: Client = self.db.get().await?;
 
-        let _stmt = "SELECT * FROM tg_group_joined WHERE NOW() > expired AND status = 0";
+        let _stmt = "SELECT * FROM tg_group_joined WHERE NOW() AT TIME ZONE 'UTC' > expired  > expired AND status = 0";
         let stmt = client.prepare(_stmt).await?;
 
         let rows = client
