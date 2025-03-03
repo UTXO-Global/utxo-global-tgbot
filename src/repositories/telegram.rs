@@ -46,13 +46,18 @@ impl TelegramDao {
         let client: Client = self.db.get().await?;
 
         let _stmt =
-            "INSERT INTO tg_group_joined (chat_id, user_id, user_name ) VALUES ($1, $2, $3) ON CONFLICT (chat_id, user_id) DO NOTHING ;";
+            "INSERT INTO tg_group_joined (chat_id, user_id, user_name, expired ) VALUES ($1, $2, $3, $4) ON CONFLICT (chat_id, user_id) DO NOTHING ;";
         let stmt = client.prepare(_stmt).await?;
 
         client
             .execute(
                 &stmt,
-                &[&member.chat_id, &member.user_id, &member.user_name],
+                &[
+                    &member.chat_id,
+                    &member.user_id,
+                    &member.user_name,
+                    &member.expired,
+                ],
             )
             .await?;
 
