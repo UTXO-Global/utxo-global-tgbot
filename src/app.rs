@@ -1,4 +1,4 @@
-use crate::handlers::member;
+use crate::handlers::{member, welcome};
 use crate::{
     config,
     repositories::{
@@ -11,6 +11,7 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
+    welcome::route(cfg);
     member::route(cfg);
 }
 
