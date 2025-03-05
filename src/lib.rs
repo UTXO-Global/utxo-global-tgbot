@@ -5,3 +5,4 @@ pub mod models;
 pub mod repositories;
 pub mod serialize;
 pub mod services;
+pub mod utils;

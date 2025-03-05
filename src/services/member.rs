@@ -1,20 +1,3 @@
-use std::{collections::HashMap, str::FromStr};
-
-use chrono::{Datelike, NaiveDate, Utc};
-use ckb_hash::{Blake2bBuilder, CKB_HASH_PERSONALIZATION};
-use ckb_sdk::{Address, AddressPayload};
-use secp256k1::{
-    ecdsa::{RecoverableSignature, RecoveryId},
-    Message, PublicKey, Secp256k1,
-};
-use serde_json::Value;
-use teloxide::{
-    payloads::BanChatMemberSetters,
-    prelude::Requester,
-    types::{ChatPermissions, UserId},
-    Bot,
-};
-
 use crate::{
     config::{self, MEMBER_BAN_DURATION},
     models::telegram::{
@@ -26,6 +9,23 @@ use crate::{
         telegram::TelegramDao,
     },
     serialize::{error::AppError, member::VerifyMemberReq},
+    utils::joyid::{verify_signature, JoyIdData},
+};
+
+use chrono::{Datelike, NaiveDate, Utc};
+use ckb_hash::{Blake2bBuilder, CKB_HASH_PERSONALIZATION};
+use ckb_sdk::{Address, AddressPayload};
+use secp256k1::{
+    ecdsa::{RecoverableSignature, RecoveryId},
+    Message, PublicKey, Secp256k1,
+};
+use serde_json::Value;
+use std::{collections::HashMap, str::FromStr};
+use teloxide::{
+    payloads::BanChatMemberSetters,
+    prelude::Requester,
+    types::{ChatPermissions, UserId},
+    Bot,
 };
 
 #[derive(Clone, Debug)]
@@ -52,10 +52,17 @@ impl MemberSrv {
         result
     }
 
-    pub async fn verify_signature(&self, req: VerifyMemberReq) -> Result<(), AppError> {
+    pub fn verify_signature_joyid(&self, req: VerifyMemberReq) -> bool {
+        let joyid_data = JoyIdData::from(&req.signature);
+        let message = format!("My tgid: {} - My DoB: {}", req.tgid, req.dob);
+
+        verify_signature(&message, joyid_data)
+    }
+
+    pub fn verify_signature_secp256k1(&self, req: VerifyMemberReq) -> bool {
         let signature = req.signature.clone();
         let message = format!("Nervos Message:My tgid: {} - My DoB: {}", req.tgid, req.dob);
-        let message_hash = self.hash_ckb(message.as_bytes());
+        let message_hash: [u8; 32] = self.hash_ckb(message.as_bytes());
         let secp_message = Message::from_digest_slice(&message_hash).expect("Invalid message hash");
 
         let sig_bytes = hex::decode(signature).expect("Invalid signature hex");
@@ -84,7 +91,17 @@ impl MemberSrv {
             true,
         );
 
-        if recovered_address.to_string() == address.to_string() {
+        recovered_address.to_string() == address.to_string()
+    }
+
+    pub async fn verify_signature(&self, req: VerifyMemberReq) -> Result<(), AppError> {
+        let is_verifed = if req.sign_type.to_lowercase() == "joyid" {
+            self.verify_signature_joyid(req.clone())
+        } else {
+            self.verify_signature_secp256k1(req.clone())
+        };
+
+        if is_verifed {
             let _ = self.verify_info(req).await;
             Ok(())
         } else {
