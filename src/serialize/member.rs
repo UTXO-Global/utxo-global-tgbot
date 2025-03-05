@@ -7,4 +7,5 @@ pub struct VerifyMemberReq {
     pub ckb_address: String,
     pub signature: String,
     pub dob: NaiveDate,
+    pub sign_type: String,
 }
