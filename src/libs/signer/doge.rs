@@ -26,7 +26,7 @@ fn verify_message_doge_ecdsa(message: &str, signature: &str, address: &str) -> b
     let secp = Secp256k1::new();
     let signature_bytes = STANDARD.decode(signature).expect("Decode signature failed");
 
-    if signature_bytes.len() < 1 {
+    if signature_bytes.is_empty() {
         return false;
     }
 
@@ -38,7 +38,7 @@ fn verify_message_doge_ecdsa(message: &str, signature: &str, address: &str) -> b
         Err(_) => return false,
     };
 
-    let recoverable_sig = match RecoverableSignature::from_compact(&raw_sign, rec_id) {
+    let recoverable_sig = match RecoverableSignature::from_compact(raw_sign, rec_id) {
         Ok(s) => s,
         Err(_) => return false,
     };
@@ -81,5 +81,5 @@ fn btc_public_key_from_p2pkh_address(address: &str) -> Option<String> {
 }
 
 pub fn verify_message(challenge: &str, data: types::SignData) -> bool {
-    verify_message_doge_ecdsa(&challenge, &data.signature, &data.identity)
+    verify_message_doge_ecdsa(challenge, &data.signature, &data.identity)
 }

@@ -14,7 +14,7 @@ pub fn verify_message(challenge: &str, data: types::SignData) -> bool {
     let sig = Signature::try_from(sig_bytes.as_slice()).expect("Failed to parse signature");
 
     match sig.recover(message_hash) {
-        Ok(recovered) => return recovered == data.identity.parse::<Address>().unwrap(),
-        Err(_) => return false,
+        Ok(recovered) => recovered == data.identity.parse::<Address>().unwrap(),
+        Err(_) => false,
     }
 }
