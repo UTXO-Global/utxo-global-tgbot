@@ -52,7 +52,7 @@ impl TelegramService {
                     if chat.is_group() || chat.is_supergroup() {
                         service.handle_message(&bot, message).await;
                     } else if let ChatKind::Private(..) = chat.clone().kind{
-                        if let Ok(command) = PrivateCommandType::parse(message.text().clone().unwrap_or(""), "bot") {
+                        if let Ok(command) = PrivateCommandType::parse(message.text().unwrap_or(""), "bot") {
                             service.handle_private_command(&bot, message, command).await;
                         }
                     }
@@ -79,7 +79,7 @@ impl TelegramService {
     pub async fn handle_message(&self, bot: &Bot, message: Message) {
         let chat = message.chat.clone();
                 
-        let text = message.text().clone().unwrap_or("");
+        let text = message.text().unwrap_or("");
 
         // Handle new chat members
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
