@@ -115,7 +115,7 @@ impl TelegramDao {
         let client: Client = self.db.get().await?;
 
         let _stmt =
-            "UPDATE tg_group_joined SET ckb_address=$1, dob=$2, status=$3, expired=$4 WHERE chat_id=$5 AND user_id=$6∂";
+            "UPDATE tg_group_joined SET ckb_address=$1, dob=$2, status=$3, expired=$4 WHERE chat_id=$5 AND user_id=$6";
         let stmt = client.prepare(_stmt).await?;
 
         let affected_rows = client

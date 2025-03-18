@@ -6,6 +6,7 @@ use secp256k1::{
     ecdsa::{RecoverableSignature, RecoveryId},
     Message, PublicKey, Secp256k1,
 };
+
 use std::str::FromStr;
 
 use crate::repositories::ckb::get_ckb_network;
@@ -32,7 +33,7 @@ pub fn verify_signature(challenge: &str, data: SignData) -> bool {
     let r = &sig_bytes[0..32];
     let s = &sig_bytes[32..64];
     let rec_id = sig_bytes[64]; // Recovery ID as byte
-    let rec_id = RecoveryId::from_i32(rec_id as i32).expect("Invalid recovery ID");
+    let rec_id = RecoveryId::try_from(rec_id as i32).expect("Invalid recovery ID");
     let mut ret: [u8; 64] = [0; 64];
     ret[..32].copy_from_slice(r);
     ret[32..].copy_from_slice(s);
