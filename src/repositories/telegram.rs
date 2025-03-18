@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use deadpool_postgres::{Client, Pool, PoolError};
 use tokio_pg_mapper::FromTokioPostgresRow;
 
-use crate::models::telegram::{TelegramGroup, TelegramGroupJoined};
+use crate::models::telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined};
 
 #[derive(Clone, Debug)]
 pub struct TelegramDao {
@@ -34,6 +34,23 @@ impl TelegramDao {
                     &group.min_approve_age,
                 ],
             )
+            .await?;
+
+        Ok(group)
+    }
+
+    pub async fn add_admin(
+        &self,
+        group: TelegramGroupAdmin,
+    ) -> Result<TelegramGroupAdmin, PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt =
+            "INSERT INTO tg_group_admins (chat_id, user_id) VALUES ($1, $2) ON CONFLICT (chat_id, user_id) DO NOTHING ;";
+        let stmt = client.prepare(_stmt).await?;
+
+        client
+            .execute(&stmt, &[&group.chat_id, &group.user_id])
             .await?;
 
         Ok(group)
@@ -86,8 +103,10 @@ impl TelegramDao {
         Ok(affected_rows > 0)
     }
 
-    pub async fn update_mmember(
+    pub async fn update_member(
         &self,
+        ckb_address: Option<String>,
+        dob: Option<NaiveDate>,
         chat_id: String,
         user_id: i64,
         expired: NaiveDateTime,
@@ -96,11 +115,14 @@ impl TelegramDao {
         let client: Client = self.db.get().await?;
 
         let _stmt =
-            "UPDATE tg_group_joined SET status=$1, expired=$2 WHERE chat_id=$3 AND user_id=$4";
+            "UPDATE tg_group_joined SET ckb_address=$1, dob=$2, status=$3, expired=$4 WHERE chat_id=$5 AND user_id=$6∂";
         let stmt = client.prepare(_stmt).await?;
 
         let affected_rows = client
-            .execute(&stmt, &[&status, &expired, &chat_id, &user_id])
+            .execute(
+                &stmt,
+                &[&ckb_address, &dob, &status, &expired, &chat_id, &user_id],
+            )
             .await?;
 
         Ok(affected_rows > 0)
@@ -139,6 +161,20 @@ impl TelegramDao {
             .collect::<Vec<TelegramGroupJoined>>());
     }
 
+    pub async fn get_group_by_admin(&self, user_id: i64) -> Result<Vec<TelegramGroup>, PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt = String::from("SELECT * FROM tg_groups WHERE chat_id IN (SELECT chat_id FROM tg_group_admins WHERE user_id=$1)");
+        let stmt = client.prepare(&_stmt).await?;
+
+        return Ok(client
+            .query(&stmt, &[&user_id])
+            .await?
+            .iter()
+            .map(|row| TelegramGroup::from_row_ref(row).unwrap())
+            .collect::<Vec<TelegramGroup>>());
+    }
+
     pub async fn get_member(
         &self,
         chat_id: String,
@@ -162,6 +198,24 @@ impl TelegramDao {
 
         let rows = client
             .query(&stmt, &[])
+            .await?
+            .iter()
+            .map(|row| TelegramGroupJoined::from_row_ref(row).unwrap())
+            .collect::<Vec<TelegramGroupJoined>>();
+        Ok(rows)
+    }
+
+    pub async fn get_member_by_group(
+        &self,
+        group_id: String,
+    ) -> Result<Vec<TelegramGroupJoined>, PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt = "SELECT * FROM tg_group_joined WHERE chat_id=$1;";
+        let stmt = client.prepare(_stmt).await?;
+
+        let rows = client
+            .query(&stmt, &[&group_id])
             .await?
             .iter()
             .map(|row| TelegramGroupJoined::from_row_ref(row).unwrap())

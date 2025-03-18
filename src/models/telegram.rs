@@ -1,4 +1,4 @@
-use chrono::NaiveDateTime;
+use chrono::{NaiveDate, NaiveDateTime};
 use serde_derive::{Deserialize, Serialize};
 use tokio_pg_mapper_derive::PostgresMapper;
 
@@ -30,11 +30,26 @@ pub struct TelegramGroup {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PostgresMapper)]
+#[pg_mapper(table = "tg_group_admins")]
+pub struct TelegramGroupAdmin {
+    pub chat_id: String,
+    pub user_id: i64,
+
+    #[serde(skip_serializing)]
+    pub created_at: NaiveDateTime,
+
+    #[serde(skip_serializing)]
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PostgresMapper)]
 #[pg_mapper(table = "tg_group_joined")]
 pub struct TelegramGroupJoined {
     pub chat_id: String,
     pub user_id: i64,
     pub user_name: String,
+    pub ckb_address: Option<String>,
+    pub dob: Option<NaiveDate>,
     pub status: i16,
     pub expired: NaiveDateTime,
 
