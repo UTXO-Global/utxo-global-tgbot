@@ -119,6 +119,7 @@ impl MemberSrv {
                                 member.user_id,
                                 member.expired,
                                 MEMBER_STATUS_ACCEPTED,
+                                balances.to_string(),
                             )
                             .await;
                     } else {
@@ -164,6 +165,7 @@ impl MemberSrv {
                                 member.user_id,
                                 member.expired,
                                 MEMBER_STATUS_REJECT,
+                                balances.to_string(),
                             )
                             .await;
                     }

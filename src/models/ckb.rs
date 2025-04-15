@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct UdtTypeScript {
     pub args: String,
     pub code_hash: String,
@@ -50,4 +50,42 @@ pub struct CKBBalance {
     pub symbol: String,
     pub balance: f64,
     pub type_hash: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TokenInfo {
+    pub symbol: Option<String>,
+    pub decimal: Option<String>,
+    pub description: Option<String>,
+    pub full_name: Option<String>,
+    pub udt_type: Option<String>,
+    pub type_script: Option<UdtTypeScript>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TokenData {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub data_type: String,
+    pub attributes: TokenInfo,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct TokenResponse {
+    pub data: TokenData,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NFTTypeScript {
+    pub args: String,
+    pub code_hash: String,
+    pub hash_type: String,
+    pub script_hash: String,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NFTInfo {
+    pub name: String,
+    pub standard: String,
+    pub type_script: NFTTypeScript,
 }

@@ -1,11 +1,12 @@
 use std::{str::FromStr, sync::Arc};
 
 use chrono::Utc;
+use serde_json::{json, Value};
 use teloxide::{
     dispatching::dialogue::GetChatId, payloads::{BanChatMemberSetters, SendMessageSetters}, prelude::*, types::{Chat, ChatKind, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
 
-use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, repositories::{member::MemberDao, telegram::TelegramDao}};
+use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::{telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, token::{Token, TOKEN_TYPE_XUDT}}, repositories::{ckb::get_xudt_info, member::MemberDao, telegram::TelegramDao, token::TokenDao}};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -14,7 +15,9 @@ pub enum CommandType {
     SetAmount(i64),
     SetAge(i32),
     GroupConfig,
-    ListUsers
+    ListUsers,
+    Sync,
+    Help,
 }
 
 #[derive(BotCommands, Clone, Debug)]
@@ -29,15 +32,17 @@ pub enum PrivateCommandType {
 pub struct TelegramService {
     pub member_dao: Arc<MemberDao>,
     pub tele_dao: Arc<TelegramDao>,
+    pub token_dao: Arc<TokenDao>,
     pub bot: Bot,
 }
 
 impl TelegramService {
-    pub fn new(member_dao: Arc<MemberDao>, tele_dao: Arc<TelegramDao>) -> Self {
+    pub fn new(member_dao: Arc<MemberDao>, tele_dao: Arc<TelegramDao>, token_dao: Arc<TokenDao>) -> Self {
         let bot_token: String = config::get("bot_token");
         TelegramService {
             member_dao: member_dao.clone(),
             tele_dao: tele_dao.clone(),
+            token_dao: token_dao.clone(),
             bot: Bot::new(bot_token)
         }
     }
@@ -146,13 +151,14 @@ impl TelegramService {
                             user_name: tgname.clone(), 
                             ckb_address: None,
                             dob: None,
-                            status: 0, 
+                            status: 0,
+                            balances: Some("{}".to_owned()),
                             expired,
                             created_at: Utc::now().naive_utc(), 
                             updated_at: Utc::now().naive_utc() 
                         }).await;
                     } else {
-                        let _ = self.tele_dao.update_member(None, None, chat.id.to_string(), tgid.0 as i64, expired, MEMBER_STATUS_PENDING).await;
+                        let _ = self.tele_dao.update_member(None, None, chat.id.to_string(), tgid.0 as i64, expired, MEMBER_STATUS_PENDING, "{}".to_owned()).await;
                     }
                 }
             }
@@ -168,10 +174,19 @@ impl TelegramService {
         let chat = message.chat.clone();
         if let Some(mut group) = self.get_group_or_create(chat.clone()).await {
             match command {
-                CommandType::SetToken(token) => {
+                CommandType::Sync => {
                     if is_admin {
-                        group.token_address = Some(token);
+                        // 
+                    } else {
+                        let _ = bot.delete_message(chat.id, message.id).await;
+                    }
+                },
+                CommandType::SetToken(type_hash) => {
+                    if is_admin {
+                        group.token_address = Some(type_hash.clone().to_lowercase()); 
                         let _ = self.tele_dao.update_group(&group).await;
+                        let _ = self.fetch_token(type_hash).await;
+                        
                     } else {
                         let _ = bot.delete_message(chat.id, message.id).await;
                     }
@@ -200,6 +215,13 @@ impl TelegramService {
                 CommandType::ListUsers => {
                     if is_admin {
                         self.send_list_users_to_admin(bot.clone(), group.chat_id, chat).await;
+                    }
+                },
+                CommandType::Help => {
+                    if is_admin {
+                        self.send_help_to_admin(bot.clone(), chat).await;
+                    } else {
+                        let _ = bot.delete_message(chat.id, message.id).await;
                     }
                 },
             }
@@ -238,8 +260,23 @@ impl TelegramService {
 
     pub async fn send_group_config_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id).await.unwrap() {
+            let mut token_info: String = "".to_owned();
+            if let Some(token) = self.fetch_token(group.token_address.unwrap()).await {
+                token_info = format!(
+                    "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
+                    token.name.unwrap(),
+                    token.symbol.unwrap(),
+                    token.type_hash,
+                    serde_json::to_string_pretty(&json!({
+                        "code_hash": token.code_hash,
+                        "hash_type": token.hash_type,
+                        "args": token.args
+                    })).unwrap()
+                );
+            }
+            
             let mut table = String::from("<pre>\n");
-            table.push_str(&format!("TokenAddress{}\nMin Age: {}\nMin Amount: {}", group.token_address.unwrap_or("".to_string()), group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
+            table.push_str(&format!("⚙️ Current Settings:\n\n{}\n👤 Minimum Age Required: {}\n💰 Minimum Balance Required: {}", token_info, group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
             table.push_str("</pre>");
             bot.send_message(chat.id, table)
             .parse_mode(ParseMode::Html)
@@ -248,17 +285,45 @@ impl TelegramService {
         }
     }
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
-        let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id).await.unwrap_or(vec![]);
-        let mut table = String::from("<pre>\n");
-        for member in members {
-            let dob = if member.dob.is_none() {
-                ""
-            } else {
-                &member.dob.unwrap().to_string()
-            };
-            table.push_str(&format!("Username: {}\nAddress: {}\nDob: {}\nStatus: {}\n\n", member.user_name, member.ckb_address.unwrap_or("".to_string()), dob, member.status));
+        if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
+            let token_type_hash = group.token_address.clone().unwrap_or("CKB".to_owned());
+            let token = self.fetch_token(token_type_hash.clone()).await;
+            let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
+            let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
+            let mut table = String::from(format!("👤 Members: {}/{}\n\n", accepted_count, members.len()));
+            if members.is_empty() {
+                table.push_str("No one has joined this group.")
+            }
+            
+            for (idx, member) in members.iter().enumerate() {
+                if member.status == MEMBER_STATUS_ACCEPTED && token.clone().is_some(){
+                    let balances = Value::from_str(&member.balances.clone().unwrap_or("{}".to_owned())).unwrap_or(json!({}));
+                    let balance = balances
+                        .get(token_type_hash.clone())
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.0);
+                    table.push_str(&format!("{}. {} {} {} (auth: true)", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
+                } else {
+                    table.push_str(&format!("{}. {} (auth: false)", idx+1, member.user_name));
+                }
+                
+            }
+            bot.send_message(chat.id, table)
+            .parse_mode(ParseMode::Html)
+            .await
+            .unwrap();
         }
-        table.push_str("</pre>");
+    }
+
+    pub async fn send_help_to_admin(&self, bot: Bot, chat: Chat) {
+        let mut table = String::from("👤 <b>Admin Commands:</b>\n\n");
+        table.push_str("1. settoken [type_hash|'ckb'] – set xUDT type\n");
+        table.push_str("2. setamount [amount] – set minimum required balance\n");
+        table.push_str("3. setage [age] – set minimum required age\n");
+        table.push_str("4. groupconfig – view current group settings\n");
+        table.push_str("5. listusers – list verified users\n");
+        table.push_str("6. sync – sync user lis\n");
+        
         bot.send_message(chat.id, table)
         .parse_mode(ParseMode::Html)
         .await
@@ -283,6 +348,7 @@ impl TelegramService {
         }
         group
     }
+    
     pub async fn is_admin(&self, message: Message, bot: &Bot) -> bool {
         if let Some(user) = message.from {
             match bot.get_chat_member(message.chat.id, user.id).send().await {
@@ -321,9 +387,51 @@ impl TelegramService {
 
                     let _ = self
                         .tele_dao
-                        .update_member(None, None, member.chat_id, member.user_id, member.expired, MEMBER_STATUS_REJECT)
+                        .update_member(None, None, member.chat_id, member.user_id, member.expired, MEMBER_STATUS_REJECT, member.balances.unwrap_or("{}".to_owned()))
                         .await;
             }
         }
+    }
+
+    pub async fn fetch_token(&self, type_hash: String) -> Option<Token>{
+        let type_hash_lowercase = type_hash.to_lowercase();
+        if type_hash_lowercase.is_empty() || type_hash_lowercase == "ckb"{
+            return Some(Token { 
+                type_hash: "".to_owned(),
+                name: Some("CKB".to_owned()), 
+                symbol: Some("CKB".to_owned()), 
+                decimal: Some("6".to_owned()),         
+                description: None,
+                token_type: 0,
+                args: "".to_owned(),
+                code_hash: "".to_owned(),
+                hash_type: "".to_owned(),
+                created_at: Utc::now().naive_utc(), 
+                updated_at: Utc::now().naive_utc(),
+            });
+        }
+        
+        let token = self.token_dao.get_token(type_hash_lowercase.clone()).await.unwrap();
+        if token.is_none() {
+            if let Some(token_info) = get_xudt_info(type_hash_lowercase.clone()).await {
+                let new_token = Token { 
+                    type_hash: type_hash_lowercase,
+                    name: token_info.full_name, 
+                    symbol: token_info.symbol, 
+                    decimal: token_info.decimal, 
+                    description: token_info.description, 
+                    token_type: TOKEN_TYPE_XUDT, 
+                    args: token_info.type_script.clone().unwrap().args, 
+                    code_hash: token_info.type_script.clone().unwrap().code_hash, 
+                    hash_type: token_info.type_script.clone().unwrap().hash_type, 
+                    created_at: Utc::now().naive_utc(), 
+                    updated_at: Utc::now().naive_utc()
+                };
+
+                let _ = self.token_dao.add_token(new_token.clone()).await;
+                return Some(new_token);
+            }
+        }
+        return token
     }
 }

@@ -51,6 +51,7 @@ pub struct TelegramGroupJoined {
     pub ckb_address: Option<String>,
     pub dob: Option<NaiveDate>,
     pub status: i16,
+    pub balances: Option<String>,
     pub expired: NaiveDateTime,
 
     #[serde(skip_serializing)]

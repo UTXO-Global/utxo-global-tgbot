@@ -3,3 +3,4 @@ pub mod ckb;
 pub mod db;
 pub mod member;
 pub mod telegram;
+pub mod token;
