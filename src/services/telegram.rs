@@ -251,18 +251,22 @@ impl TelegramService {
     pub async fn send_group_config_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id).await.unwrap() {
             let mut token_info: String = "".to_owned();
-            if let Some(token) = self.fetch_token(group.token_address.unwrap()).await {
-                token_info = format!(
-                    "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
-                    token.name.unwrap(),
-                    token.symbol.unwrap(),
-                    token.type_hash,
-                    serde_json::to_string_pretty(&json!({
-                        "code_hash": token.code_hash,
-                        "hash_type": token.hash_type,
-                        "args": token.args
-                    })).unwrap()
-                );
+            if let Some(type_hash) = group.token_address {
+                if let Some(token) = self.fetch_token(type_hash).await {
+                    token_info = format!(
+                        "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
+                        token.name.unwrap(),
+                        token.symbol.unwrap(),
+                        token.type_hash,
+                        serde_json::to_string_pretty(&json!({
+                            "code_hash": token.code_hash,
+                            "hash_type": token.hash_type,
+                            "args": token.args
+                        })).unwrap()
+                    );
+                }
+            } else {
+                token_info = String::from("📦 Token Info:\n- Name: CKB\n- Symbol: CKB\n");
             }
             
             let mut table = String::from("<pre>\n");
