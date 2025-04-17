@@ -16,4 +16,4 @@ pub fn get<'a, T: serde::Deserialize<'a>>(key: &str) -> T {
 }
 
 pub const MEMBER_KYC_DURATION: TimeDelta = Duration::minutes(3);
-pub const MEMBER_BAN_DURATION: TimeDelta = Duration::minutes(5);
+pub const MEMBER_BAN_DURATION: TimeDelta = Duration::minutes(15);
