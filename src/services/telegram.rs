@@ -379,7 +379,9 @@ impl TelegramService {
                         .send_message(
                             member.clone().chat_id.to_string(),
                             format!(
-                                "⚠️ User {} banned! \nReason: did not complete verification within 3 minutes",
+                                "🔴 **{}** failed verification and was removed.\n\
+                                _Reason:_ didn’t complete verification within 3 minutes.\n\
+                                They can rejoin and try again after the 15‑minute cooldown.",
                                 member.clone().user_name,
                             ),
                         )

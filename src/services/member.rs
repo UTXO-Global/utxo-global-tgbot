@@ -106,7 +106,11 @@ impl MemberSrv {
                             .await;
                         bot.send_message(
                             member.clone().chat_id.to_string(),
-                            format!("✅ User {} approved!", member.clone().user_name),
+                            format!(
+                                "🟢 **Verification successful!**\n\
+                                Welcome, **{}** — you now have full access. Enjoy the chat! 🎉",
+                                member.clone().user_name
+                            ),
                         )
                         .await
                         .unwrap();
@@ -149,7 +153,9 @@ impl MemberSrv {
                             .send_message(
                                 member.clone().chat_id.to_string(),
                                 format!(
-                                    "⚠️ User {} banned! \nReason: {}",
+                                    "🔴 **{}** failed verification and was removed.\n\
+                                    _Reason:_ {}.\n\
+                                    They can rejoin and try again after the 15‑minute cooldown.",
                                     member.clone().user_name,
                                     reason
                                 ),
