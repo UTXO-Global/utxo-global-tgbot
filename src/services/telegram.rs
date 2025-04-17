@@ -308,12 +308,12 @@ impl TelegramService {
 
     pub async fn send_help_to_admin(&self, bot: Bot, chat: Chat) {
         let mut table = String::from("👤 <b>Admin Commands:</b>\n\n");
-        table.push_str("1. settoken [type_hash|'ckb'] – set xUDT type\n");
-        table.push_str("2. setamount [amount] – set minimum required balance\n");
-        table.push_str("3. setage [age] – set minimum required age\n");
-        table.push_str("4. groupconfig – view current group settings\n");
-        table.push_str("5. listusers – list verified users\n");
-        table.push_str("6. sync – sync user lis\n");
+        table.push_str("1. /settoken <type_hash|ckb> – set the gated token\n");
+        table.push_str("2. /setamount <amount>       – Set minimum required balance\n");
+        table.push_str("3. /setage <age>             – Set minimum required age (years)\n");
+        table.push_str("4. /groupconfig              – View current group settings\n");
+        table.push_str("5. /listusers                – List currently verified users\n");
+        table.push_str("6. /mygroups                 – Bot status: list groups the bot manages\n");
         
         bot.send_message(chat.id, table)
         .parse_mode(ParseMode::Html)
@@ -370,7 +370,9 @@ impl TelegramService {
                         .send_message(
                             member.clone().chat_id.to_string(),
                             format!(
-                                "⚠️ User {} banned! \nReason: did not complete verification within 3 minutes",
+                                "🔴 **{}** failed verification and was removed.\n\
+                                _Reason:_ didn’t complete verification within 3 minutes.\n\
+                                They can rejoin and try again after the 15‑minute cooldown.",
                                 member.clone().user_name,
                             ),
                         )

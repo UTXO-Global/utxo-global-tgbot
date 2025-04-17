@@ -221,7 +221,7 @@ impl TelegramDao {
         let client: Client = self.db.get().await?;
 
         let _stmt =
-            "SELECT * FROM tg_group_joined WHERE NOW() AT TIME ZONE 'UTC' > expired AND status = 0";
+            "SELECT * FROM tg_group_joined WHERE NOW() AT TIME ZONE 'UTC' > expired AND status = 0;";
         let stmt = client.prepare(_stmt).await?;
 
         let rows = client
