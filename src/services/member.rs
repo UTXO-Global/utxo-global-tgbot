@@ -110,6 +110,7 @@ impl MemberSrv {
                         )
                         .await
                         .unwrap();
+
                         let _ = self
                             .tele_dao
                             .update_member(

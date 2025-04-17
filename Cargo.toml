@@ -43,7 +43,7 @@ tokio-pg-mapper = { version = "0.2.0", features = ["tokio-pg-mapper-derive"] }
 tokio-pg-mapper-derive = "0.2.0"
 pg_bigdecimal = { version = "0.1.5", features = ["serde"] }
 tokio = "1.42.0"
-teloxide = { version = "0.13", features = ["macros"] }
+teloxide = { version = "0.15", features = ["macros"] }
 log = "0.4.22"
 reqwest = { version = "0.12.12", features = ["blocking", "json"] }
 serde_json = "1.0.134"

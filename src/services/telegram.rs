@@ -16,7 +16,6 @@ pub enum CommandType {
     SetAge(i32),
     GroupConfig,
     ListUsers,
-    Sync,
     Help,
 }
 
@@ -83,9 +82,7 @@ impl TelegramService {
 
     pub async fn handle_message(&self, bot: &Bot, message: Message) {
         let chat = message.chat.clone();
-                
         let text = message.text().unwrap_or("");
-
         // Handle new chat members
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
             let chat_title = match chat.kind.clone() {
@@ -174,13 +171,6 @@ impl TelegramService {
         let chat = message.chat.clone();
         if let Some(mut group) = self.get_group_or_create(chat.clone()).await {
             match command {
-                CommandType::Sync => {
-                    if is_admin {
-                        // 
-                    } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
-                    }
-                },
                 CommandType::SetToken(type_hash) => {
                     if is_admin {
                         group.token_address = Some(type_hash.clone().to_lowercase()); 
@@ -284,13 +274,14 @@ impl TelegramService {
             .unwrap();
         }
     }
+    
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
             let token_type_hash = group.token_address.clone().unwrap_or("CKB".to_owned());
             let token = self.fetch_token(token_type_hash.clone()).await;
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
-            let mut table = String::from(format!("👤 Members: {}/{}\n\n", accepted_count, members.len()));
+            let mut table = format!("👤 Members: {}/{}\n\n", accepted_count, members.len());
             if members.is_empty() {
                 table.push_str("No one has joined this group.")
             }
@@ -432,6 +423,6 @@ impl TelegramService {
                 return Some(new_token);
             }
         }
-        return token
+        token
     }
 }
