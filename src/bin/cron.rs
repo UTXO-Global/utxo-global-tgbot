@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::sync::Arc;
 
 use utxo_global_tgbot_api::{
     repositories::{db::DB_POOL, member::MemberDao, telegram::TelegramDao, token::TokenDao},
@@ -6,11 +6,15 @@ use utxo_global_tgbot_api::{
 };
 
 async fn run_crons(telegram_svc: Arc<TelegramService>) {
+    /*
     let time_duration: u64 = 10;
     loop {
         telegram_svc.cron_auto_kick_member().await;
         thread::sleep(Duration::from_secs(time_duration));
     }
+    */
+
+    telegram_svc.cron_auto_kick_member().await;
 }
 
 #[tokio::main]
