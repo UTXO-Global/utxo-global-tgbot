@@ -290,7 +290,8 @@ impl TelegramService {
             let token = self.fetch_token(token_type_hash.clone()).await;
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
-            let mut table = String::from(format!("👤 Members: {}/{}\n\n", accepted_count, members.len()));
+            
+            let mut table = String::from(format!("👥 Verification Status: {}/{} members verified\n\n", accepted_count, members.len()));
             if members.is_empty() {
                 table.push_str("No one has joined this group.")
             }
@@ -302,9 +303,9 @@ impl TelegramService {
                         .get(token_type_hash.clone())
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
-                    table.push_str(&format!("{}. {} {} {} (auth: true)", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
+                    table.push_str(&format!("{}. @{} {} {} (auth: true)", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
                 } else {
-                    table.push_str(&format!("{}. {} (auth: false)", idx+1, member.user_name));
+                    table.push_str(&format!("{}. @{} (❌ Not verified yet)", idx+1, member.user_name));
                 }
                 
             }
@@ -317,12 +318,12 @@ impl TelegramService {
 
     pub async fn send_help_to_admin(&self, bot: Bot, chat: Chat) {
         let mut table = String::from("👤 <b>Admin Commands:</b>\n\n");
-        table.push_str("1. /settoken <type_hash|ckb> – set the gated token\n");
-        table.push_str("2. /setamount <amount>       – Set minimum required balance\n");
-        table.push_str("3. /setage <age>             – Set minimum required age (years)\n");
-        table.push_str("4. /groupconfig              – View current group settings\n");
-        table.push_str("5. /listusers                – List currently verified users\n");
-        table.push_str("6. /mygroups                 – Bot status: list groups the bot manages\n");
+        table.push_str("1. /settoken <type_script_hash|ckb> – set the gated token\n");
+        table.push_str("2. /setamount <amount>              – Set minimum required balance\n");
+        table.push_str("3. /setage <age>                    – Set minimum required age (years)\n");
+        table.push_str("4. /groupconfig                     – View current group settings\n");
+        table.push_str("5. /listusers                       – List currently verified users\n");
+        table.push_str("6. /mygroups                        – Bot status: list groups the bot manages\n");
         
         bot.send_message(chat.id, table)
         .parse_mode(ParseMode::Html)
