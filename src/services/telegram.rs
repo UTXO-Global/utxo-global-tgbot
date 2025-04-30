@@ -16,7 +16,6 @@ pub enum CommandType {
     SetAge(i32),
     GroupConfig,
     ListUsers,
-    Sync,
     Help,
 }
 
@@ -83,9 +82,7 @@ impl TelegramService {
 
     pub async fn handle_message(&self, bot: &Bot, message: Message) {
         let chat = message.chat.clone();
-                
         let text = message.text().unwrap_or("");
-
         // Handle new chat members
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
             let chat_title = match chat.kind.clone() {
@@ -174,13 +171,6 @@ impl TelegramService {
         let chat = message.chat.clone();
         if let Some(mut group) = self.get_group_or_create(chat.clone()).await {
             match command {
-                CommandType::Sync => {
-                    if is_admin {
-                        // 
-                    } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
-                    }
-                },
                 CommandType::SetToken(type_hash) => {
                     if is_admin {
                         group.token_address = Some(type_hash.clone().to_lowercase()); 
@@ -261,18 +251,22 @@ impl TelegramService {
     pub async fn send_group_config_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id).await.unwrap() {
             let mut token_info: String = "".to_owned();
-            if let Some(token) = self.fetch_token(group.token_address.unwrap()).await {
-                token_info = format!(
-                    "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
-                    token.name.unwrap(),
-                    token.symbol.unwrap(),
-                    token.type_hash,
-                    serde_json::to_string_pretty(&json!({
-                        "code_hash": token.code_hash,
-                        "hash_type": token.hash_type,
-                        "args": token.args
-                    })).unwrap()
-                );
+            if let Some(type_hash) = group.token_address {
+                if let Some(token) = self.fetch_token(type_hash).await {
+                    token_info = format!(
+                        "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
+                        token.name.unwrap(),
+                        token.symbol.unwrap(),
+                        token.type_hash,
+                        serde_json::to_string_pretty(&json!({
+                            "code_hash": token.code_hash,
+                            "hash_type": token.hash_type,
+                            "args": token.args
+                        })).unwrap()
+                    );
+                }
+            } else {
+                token_info = String::from("📦 Token Info:\n- Name: CKB\n- Symbol: CKB\n");
             }
             
             let mut table = String::from("<pre>\n");
@@ -284,6 +278,7 @@ impl TelegramService {
             .unwrap();
         }
     }
+    
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
             let token_type_hash = group.token_address.clone().unwrap_or("CKB".to_owned());
@@ -435,6 +430,6 @@ impl TelegramService {
                 return Some(new_token);
             }
         }
-        return token
+        token
     }
 }

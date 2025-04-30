@@ -86,10 +86,15 @@ impl MemberSrv {
                     let min_age_approved = group_unwrap.clone().min_approve_age.unwrap_or(0);
                     let min_balance_approved =
                         group_unwrap.clone().min_approve_balance.unwrap_or(0) as f64;
-                    let token_address = group_unwrap
+
+                    let mut token_address = group_unwrap
                         .clone()
                         .token_address
                         .unwrap_or("CKB".to_owned());
+
+                    if token_address.is_empty() {
+                        token_address = "CKB".to_owned();
+                    }
 
                     let balance = balances
                         .get(token_address)
@@ -114,6 +119,7 @@ impl MemberSrv {
                         )
                         .await
                         .unwrap();
+
                         let _ = self
                             .tele_dao
                             .update_member(

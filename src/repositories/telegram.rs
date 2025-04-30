@@ -103,6 +103,7 @@ impl TelegramDao {
         Ok(affected_rows > 0)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_member(
         &self,
         ckb_address: Option<String>,
@@ -132,6 +133,24 @@ impl TelegramDao {
                     &user_id,
                 ],
             )
+            .await?;
+
+        Ok(affected_rows > 0)
+    }
+
+    pub async fn update_status_all_members(
+        &self,
+        chat_id: String,
+        expired: NaiveDateTime,
+        status: i16,
+    ) -> Result<bool, PoolError> {
+        let client: Client = self.db.get().await?;
+
+        let _stmt = "UPDATE tg_group_joined SET status=$1, expired=$2 WHERE chat_id=$3";
+        let stmt = client.prepare(_stmt).await?;
+
+        let affected_rows = client
+            .execute(&stmt, &[&status, &expired, &chat_id])
             .await?;
 
         Ok(affected_rows > 0)
