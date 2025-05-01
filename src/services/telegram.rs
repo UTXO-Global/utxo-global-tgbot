@@ -174,8 +174,32 @@ impl TelegramService {
                 CommandType::SetToken(type_hash) => {
                     if is_admin {
                         group.token_address = Some(type_hash.clone().to_lowercase()); 
-                        let _ = self.tele_dao.update_group(&group).await;
-                        let _ = self.fetch_token(type_hash).await;
+                        if let Some(token) = self.fetch_token(type_hash).await {
+                            group.token_address = Some(token.type_hash);
+                            let is_updated = self.tele_dao.update_group(&group).await.unwrap_or(false);
+                            if is_updated {
+                                bot.send_message(
+                                    chat.id,
+                                    "🟢 **Update Type Hash successfully!**",
+                                )
+                                .await
+                                .unwrap();
+                            } else {
+                                bot.send_message(
+                                    chat.id,
+                                    "🔴 **Update Type Hash faild!**\nPlease try again letter",
+                                )
+                                .await
+                                .unwrap();
+                            }
+                        } else {
+                            bot.send_message(
+                                chat.id,
+                                "🔴 **Update Type Hash faild!**\nType hash invalid",
+                            )
+                            .await
+                            .unwrap();
+                        }
                         
                     } else {
                         let _ = bot.delete_message(chat.id, message.id).await;
