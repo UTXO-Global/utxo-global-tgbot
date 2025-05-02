@@ -180,14 +180,14 @@ impl TelegramService {
                             if is_updated {
                                 bot.send_message(
                                     chat.id,
-                                    "🟢 **Update Type Hash successfully!**",
+                                    String::from(format!("🟢 **Update token: {:?} successfully!**", token.name)),
                                 )
                                 .await
                                 .unwrap();
                             } else {
                                 bot.send_message(
                                     chat.id,
-                                    "🔴 **Update Type Hash faild!**\nPlease try again letter",
+                                    "🔴 **Update token failed!**\nPlease try again later or contact admin for support.",
                                 )
                                 .await
                                 .unwrap();
@@ -195,7 +195,7 @@ impl TelegramService {
                         } else {
                             bot.send_message(
                                 chat.id,
-                                "🔴 **Update Type Hash faild!**\nType hash invalid",
+                                "🔴 **Update token failed!**\n Invalid type hash",
                             )
                             .await
                             .unwrap();
