@@ -53,7 +53,7 @@ impl MemberSrv {
             .await
         {
             Ok(joined_groups) => {
-                let balances = get_balances(req.ckb_address).await;
+                let balances = get_balances(req.ckb_address.clone()).await;
                 let age = self.calc_age(req.dob);
                 let bot_token: String = config::get("bot_token");
                 let bot = Bot::new(bot_token);
@@ -86,10 +86,15 @@ impl MemberSrv {
                     let min_age_approved = group_unwrap.clone().min_approve_age.unwrap_or(0);
                     let min_balance_approved =
                         group_unwrap.clone().min_approve_balance.unwrap_or(0) as f64;
-                    let token_address = group_unwrap
+
+                    let mut token_address = group_unwrap
                         .clone()
                         .token_address
                         .unwrap_or("CKB".to_owned());
+
+                    if token_address.is_empty() {
+                        token_address = "CKB".to_owned();
+                    }
 
                     let balance = balances
                         .get(token_address)
@@ -106,17 +111,25 @@ impl MemberSrv {
                             .await;
                         bot.send_message(
                             member.clone().chat_id.to_string(),
-                            format!("✅ User {} approved!", member.clone().user_name),
+                            format!(
+                                "🟢 **Verification successful!**\n\
+                                Welcome, **{}** — you now have full access. Enjoy the chat! 🎉",
+                                member.clone().user_name
+                            ),
                         )
                         .await
                         .unwrap();
+
                         let _ = self
                             .tele_dao
-                            .update_mmember(
+                            .update_member(
+                                Some(req.ckb_address.clone()),
+                                Some(req.dob),
                                 member.chat_id,
                                 member.user_id,
                                 member.expired,
                                 MEMBER_STATUS_ACCEPTED,
+                                balances.to_string(),
                             )
                             .await;
                     } else {
@@ -146,7 +159,9 @@ impl MemberSrv {
                             .send_message(
                                 member.clone().chat_id.to_string(),
                                 format!(
-                                    "⚠️ User {} banned! \nReason: {}",
+                                    "🔴 **{}** failed verification and was removed.\n\
+                                    _Reason:_ {}.\n\
+                                    They can rejoin and try again after the 15‑minute cooldown.",
                                     member.clone().user_name,
                                     reason
                                 ),
@@ -155,11 +170,14 @@ impl MemberSrv {
 
                         let _ = self
                             .tele_dao
-                            .update_mmember(
+                            .update_member(
+                                Some(req.ckb_address.clone()),
+                                Some(req.dob),
                                 member.chat_id,
                                 member.user_id,
                                 member.expired,
                                 MEMBER_STATUS_REJECT,
+                                balances.to_string(),
                             )
                             .await;
                     }

@@ -8,8 +8,9 @@ async fn main() {
     env_logger::init();
     let db = &DB_POOL.clone();
     let member_dao = Arc::new(repositories::member::MemberDao::new(db.clone()));
-    let telegram_dao: Arc<repositories::telegram::TelegramDao> =
-        Arc::new(repositories::telegram::TelegramDao::new(db.clone()));
+    let tele_dao = Arc::new(repositories::telegram::TelegramDao::new(db.clone()));
+
+    let token_dao = Arc::new(repositories::token::TokenDao::new(db.clone()));
 
     // migrate db
     if let Err(e) = migrate_db().await {
@@ -19,7 +20,8 @@ async fn main() {
     // Initialize the bot
     let telegram_srv = Arc::new(TelegramService::new(
         member_dao.clone(),
-        telegram_dao.clone(),
+        tele_dao.clone(),
+        token_dao.clone(),
     ));
     telegram_srv.start().await;
 }

@@ -33,7 +33,7 @@ fn verify_message_doge_ecdsa(message: &str, signature: &str, address: &str) -> b
     let recovery_bit = signature_bytes[0];
     let raw_sign = &signature_bytes[1..];
 
-    let rec_id = match secp256k1::ecdsa::RecoveryId::from_i32((recovery_bit - 31) as i32) {
+    let rec_id = match secp256k1::ecdsa::RecoveryId::try_from((recovery_bit - 31) as i32) {
         Ok(id) => id,
         Err(_) => return false,
     };

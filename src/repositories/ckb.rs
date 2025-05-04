@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{config, models::ckb::AddressResponse, serialize::error::AppError};
+use crate::{
+    config,
+    models::ckb::{AddressResponse, NFTInfo, TokenInfo, TokenResponse},
+    serialize::error::AppError,
+};
 use ckb_sdk::{rpc::CkbRpcClient, NetworkType};
 use reqwest::{header, Client};
 use serde_json::json;
@@ -42,6 +46,30 @@ pub async fn get_ckb_client() -> CkbRpcClient {
         .expect("Failed to create CkbRpcClient")
 }
 
+pub async fn get_xudt_info(type_hash: String) -> Option<TokenInfo> {
+    let network = get_ckb_network();
+    let path = &format!("/v1/xudts/{}", type_hash);
+    if let Ok(info) = proxy_request("GET", network, path, None).await {
+        if let Ok(token_res) = serde_json::from_value::<TokenResponse>(info) {
+            return Some(token_res.data.attributes);
+        }
+    }
+
+    None
+}
+
+pub async fn get_collection_info(type_hash: String) -> Option<NFTInfo> {
+    let network = get_ckb_network();
+    let path = &format!("/v2/nft/collections/{}", type_hash);
+    if let Ok(info) = proxy_request("GET", network, path, None).await {
+        if let Ok(nft_info) = serde_json::from_value::<NFTInfo>(info) {
+            return Some(nft_info);
+        }
+    }
+
+    None
+}
+
 pub async fn get_balances(address: String) -> serde_json::Value {
     let network = get_ckb_network();
     let path = &format!("/v1/addresses/{}", address);
@@ -51,7 +79,8 @@ pub async fn get_balances(address: String) -> serde_json::Value {
             if let Some(address_data) = address_response.data.first() {
                 let attributes = &address_data.attributes;
                 let balance = attributes.balance.parse::<f64>().unwrap_or(0.0);
-                let balance_occupied = attributes.live_cells_count.parse::<f64>().unwrap_or(0.0);
+                let balance_occupied: f64 =
+                    attributes.live_cells_count.parse::<f64>().unwrap_or(0.0);
                 balance_map.insert(
                     "CKB".to_string(),
                     (balance - balance_occupied) / 10f64.powi(8),
