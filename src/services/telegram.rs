@@ -47,7 +47,7 @@ impl TelegramService {
     }
 
     pub async fn start(self: Arc<Self>){
-        println!("Telegram Bot Runnig....");
+        println!("Telegram Bot Running....");
         teloxide::repl(self.bot.clone(), {
             move |bot: Bot, message: Message| {
                 let service: Arc<TelegramService> = Arc::clone(&self);
@@ -83,14 +83,18 @@ impl TelegramService {
     pub async fn handle_message(&self, bot: &Bot, message: Message) {
         let chat = message.chat.clone();
         let text = message.text().unwrap_or("");
+
         // Handle new chat members
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
             let chat_title = match chat.kind.clone() {
                 teloxide::types::ChatKind::Public(chat_public) => &chat_public.title.unwrap_or("".to_string()),
                 teloxide::types::ChatKind::Private(chat_private) =>  &chat_private.first_name.unwrap_or("".to_string()),
             }; 
-            let _ = self.update_group_admin(bot.clone(), chat.clone()).await;
 
+            // if telegram user is admin, then add him/her to group_admins
+            self.update_group_admin(bot.clone(), chat.clone()).await;
+
+            // create a new group if not exist
             let _ = self.tele_dao.add_group(TelegramGroup{ 
                 chat_id: chat.id.to_string(), 
                 name: chat_title.to_string(), 
@@ -117,6 +121,7 @@ impl TelegramService {
                             "Visit",
                             reqwest::Url::from_str(kyc_link.as_str()).unwrap(),
                         )]]);
+                
                 // handle error
                 if let Err(err) = bot
                     .send_message(
@@ -169,74 +174,80 @@ impl TelegramService {
     pub async fn handle_command(&self, bot: &Bot, message: Message, command: CommandType) {
         let is_admin = self.is_admin(message.clone(), bot).await;
         let chat = message.chat.clone();
+
+        // the `/` commands are only for admin
+        if !is_admin {
+            bot.send_message(
+                chat.id,
+                "❌ You need “Ban Users” permission to view group settings.",
+            )
+            .await
+            .unwrap();
+
+            let _ = bot.delete_message(chat.id, message.id).await;
+        }
+
         if let Some(mut group) = self.get_group_or_create(chat.clone()).await {
             match command {
                 CommandType::SetToken(type_hash) => {
-                    if is_admin {
-                        group.token_address = Some(type_hash.clone().to_lowercase()); 
-                        if let Some(token) = self.fetch_token(type_hash).await {
-                            group.token_address = Some(token.type_hash);
-                            let is_updated = self.tele_dao.update_group(&group).await.unwrap_or(false);
-                            if is_updated {
-                                bot.send_message(
-                                    chat.id,
-                                    String::from(format!("🟢 **Update token: {:?} successfully!**", token.name)),
-                                )
-                                .await
-                                .unwrap();
-                            } else {
-                                bot.send_message(
-                                    chat.id,
-                                    "🔴 **Update token failed!**\nPlease try again later or contact admin for support.",
-                                )
-                                .await
-                                .unwrap();
-                            }
+                    group.token_address = Some(type_hash.clone().to_lowercase()); 
+                    if let Some(token) = self.fetch_token(type_hash).await {
+                        group.token_address = Some(token.type_hash);
+                        let is_updated = self.tele_dao.update_group(&group).await.unwrap_or(false);
+                        if is_updated {
+                            bot.send_message(
+                                chat.id,
+                                String::from(format!("🟢 **Update token: {:?} successfully!**", token.name)),
+                            )
+                            .await
+                            .unwrap();
                         } else {
                             bot.send_message(
                                 chat.id,
-                                "🔴 **Update token failed!**\n Invalid type hash",
+                                "🔴 **Update token failed!**\nPlease try again later or contact admin for support.",
                             )
                             .await
                             .unwrap();
                         }
-                        
                     } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
+                        bot.send_message(
+                            chat.id,
+                            "🔴 **Update token failed!**\n Invalid Type Hash",
+                        )
+                        .await
+                        .unwrap();
                     }
                 }
                 CommandType::SetAmount(amount) => {
-                    if is_admin {
-                        group.min_approve_balance = Some(amount);
-                        let _ = self.tele_dao.update_group(&group).await;
-                    } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
-                    }
+                    group.min_approve_balance = Some(amount);
+                    let _ = self.tele_dao.update_group(&group).await;
                 }
                 CommandType::SetAge(age) => {
-                    if is_admin {
-                        group.min_approve_age = Some(age);
-                        let _ = self.tele_dao.update_group(&group).await;
-                    } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
-                    }
+                    group.min_approve_age = Some(age);
+                    match self.tele_dao.update_group(&group).await {
+                        Ok(_) => {
+                            bot.send_message(chat.id, "✅ Group settings updated successfully\\.")
+                                .parse_mode(ParseMode::MarkdownV2)
+                                .await
+                                .unwrap();
+                        }
+                        Err(err) => {
+                            let err_text = format!("⚠️ Failed to update group settings:\n`{}`", &err.to_string());
+                            bot.send_message(chat.id, err_text)
+                                .parse_mode(ParseMode::MarkdownV2)
+                                .await
+                                .unwrap();
+                        }
+                    } 
                 }
                 CommandType::GroupConfig => {
-                    if is_admin {
-                        self.send_group_config_to_admin(bot.clone(), group.chat_id, chat).await;
-                    }
+                    self.send_group_config_to_admin(bot.clone(), group.chat_id, chat).await;
                 },
                 CommandType::ListUsers => {
-                    if is_admin {
-                        self.send_list_users_to_admin(bot.clone(), group.chat_id, chat).await;
-                    }
+                    self.send_list_users_to_admin(bot.clone(), group.chat_id, chat).await;
                 },
                 CommandType::Help => {
-                    if is_admin {
-                        self.send_help_to_admin(bot.clone(), chat).await;
-                    } else {
-                        let _ = bot.delete_message(chat.id, message.id).await;
-                    }
+                    self.send_help_to_admin(bot.clone(), chat).await;
                 },
             }
         }
@@ -278,26 +289,21 @@ impl TelegramService {
             if let Some(type_hash) = group.token_address {
                 if let Some(token) = self.fetch_token(type_hash).await {
                     token_info = format!(
-                        "📦 Token Info:\n- Name: {}\n- Symbol: {}\n- Type hash: {}\nScript:{}\n", 
+                        "📦 Token Gating: {}\n🔹 Type Hash: {}\n", 
                         token.name.unwrap(),
-                        token.symbol.unwrap(),
-                        token.type_hash,
-                        serde_json::to_string_pretty(&json!({
-                            "code_hash": token.code_hash,
-                            "hash_type": token.hash_type,
-                            "args": token.args
-                        })).unwrap()
+                        token.type_hash
                     );
                 }
             } else {
-                token_info = String::from("📦 Token Info:\n- Name: CKB\n- Symbol: CKB\n");
+                token_info = String::from("📦 Token Gating: CKB\n");
             }
             
-            let mut table = String::from("<pre>\n");
-            table.push_str(&format!("⚙️ Current Settings:\n\n{}\n👤 Minimum Age Required: {}\n💰 Minimum Balance Required: {}", token_info, group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
-            table.push_str("</pre>");
+            let mut table = String::from("").to_owned();
+            table.push_str("⚙️ Current Settings \\(Admin Only\\)\n\n");
+            table.push_str(&format!("{}", token_info));
+            table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
             bot.send_message(chat.id, table)
-            .parse_mode(ParseMode::Html)
+            .parse_mode(ParseMode::MarkdownV2)
             .await
             .unwrap();
         }
@@ -336,16 +342,16 @@ impl TelegramService {
     }
 
     pub async fn send_help_to_admin(&self, bot: Bot, chat: Chat) {
-        let mut table = String::from("👤 <b>Admin Commands:</b>\n\n");
-        table.push_str("1. /settoken <type_script_hash|ckb> – set the gated token\n");
-        table.push_str("2. /setamount <amount>              – Set minimum required balance\n");
-        table.push_str("3. /setage <age>                    – Set minimum required age (years)\n");
-        table.push_str("4. /groupconfig                     – View current group settings\n");
-        table.push_str("5. /listusers                       – List currently verified users\n");
-        table.push_str("6. /mygroups                        – Bot status: list groups the bot manages\n");
+        let mut table = String::from("*👤 Admin Commands:*\n\n");
+        table.push_str("1\\. `/settoken (type_script_hash|ckb)`: Set the gated token\n");
+        table.push_str("2\\. `/setamount (amount)`: Set minimum required balance\n");
+        table.push_str("3\\. `/setage (age)`: Set minimum required age \\(years\\)\n");
+        table.push_str("4\\. `/groupconfig`: View current group settings\n");
+        table.push_str("5\\. `/listusers`: List currently verified users\n");
+        table.push_str("6\\. `/mygroups`: Bot status: list groups the bot manages\n");
         
         bot.send_message(chat.id, table)
-        .parse_mode(ParseMode::Html)
+        .parse_mode(ParseMode::MarkdownV2)
         .await
         .unwrap();
     }
