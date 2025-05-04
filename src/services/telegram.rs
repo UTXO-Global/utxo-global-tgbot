@@ -185,6 +185,7 @@ impl TelegramService {
             .unwrap();
 
             let _ = bot.delete_message(chat.id, message.id).await;
+            return
         }
 
         if let Some(mut group) = self.get_group_or_create(chat.clone()).await {

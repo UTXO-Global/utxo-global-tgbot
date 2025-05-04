@@ -38,7 +38,7 @@ impl MemberSrv {
         sign_data.ckb_address = Some(req.ckb_address.clone());
 
         if verify::verify_message(&challenge, sign_data) {
-            let _ = self.verify_info(req).await;
+            self.verify_info(req).await;
             Ok(())
         } else {
             Err(AppError::new(500).message("Signature not matched"))
@@ -143,7 +143,7 @@ impl MemberSrv {
                             .await;
 
                         let reason = if age < min_age_approved {
-                            format!("Under {} years odl", min_age_approved)
+                            format!("Under {} years old", min_age_approved)
                         } else {
                             format!(
                                 "Insufficient balance(Min: {} {})",
