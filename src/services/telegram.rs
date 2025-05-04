@@ -192,23 +192,26 @@ impl TelegramService {
                 CommandType::SetToken(type_hash) => {
                     group.token_address = Some(type_hash.clone().to_lowercase()); 
                     if let Some(token) = self.fetch_token(type_hash).await {
-                        group.token_address = Some(token.type_hash);
+                        group.token_address = Some(token.type_hash.clone());
                         let is_updated = self.tele_dao.update_group(&group).await.unwrap_or(false);
-                        if is_updated {
-                            bot.send_message(
-                                chat.id,
-                                String::from(format!("🟢 **Update token: {:?} successfully!**", token.name)),
-                            )
-                            .await
-                            .unwrap();
+
+                        let token_name = token
+                                                    .name                       
+                                                    .clone()                    
+                                                    .unwrap_or_else(|| "Unknown".to_string());
+                        let reply = if is_updated {
+                            format!("🟢 **Update token: {} successfully!**", token_name)
                         } else {
-                            bot.send_message(
-                                chat.id,
-                                "🔴 **Update token failed!**\nPlease try again later or contact admin for support.",
-                            )
-                            .await
-                            .unwrap();
-                        }
+                            "🔴 **Update token failed!**\nPlease try again later or contact admin for support."
+                                .to_string()
+                        };
+
+                        bot.send_message(
+                            chat.id,
+                            reply,
+                        )
+                        .await
+                        .unwrap();
                     } else {
                         bot.send_message(
                             chat.id,
@@ -220,7 +223,21 @@ impl TelegramService {
                 }
                 CommandType::SetAmount(amount) => {
                     group.min_approve_balance = Some(amount);
-                    let _ = self.tele_dao.update_group(&group).await;
+                    match self.tele_dao.update_group(&group).await {
+                        Ok(_) => {
+                            bot.send_message(chat.id, "✅ Group settings updated successfully\\.")
+                                .parse_mode(ParseMode::MarkdownV2)
+                                .await
+                                .unwrap();
+                        },
+                        Err(err) => {
+                            let err_text = format!("⚠️ Failed to update group settings:\n`{}`", &err.to_string());
+                            bot.send_message(chat.id, err_text)
+                                .parse_mode(ParseMode::MarkdownV2)
+                                .await
+                                .unwrap();
+                        },
+                    }
                 }
                 CommandType::SetAge(age) => {
                     group.min_approve_age = Some(age);
