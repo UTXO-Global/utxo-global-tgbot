@@ -346,9 +346,9 @@ impl TelegramService {
                         .get(token_type_hash.clone())
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
-                    table.push_str(&format!("{}. @{} {} {} (auth: true)", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
+                    table.push_str(&format!("{}. @{} {} {} (auth: true)\n", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
                 } else {
-                    table.push_str(&format!("{}. @{} (❌ Not verified yet)", idx+1, member.user_name));
+                    table.push_str(&format!("{}. @{} (❌ Not verified yet)\n", idx+1, member.user_name));
                 }
                 
             }
