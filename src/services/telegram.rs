@@ -6,7 +6,7 @@ use teloxide::{
     dispatching::dialogue::GetChatId, payloads::{BanChatMemberSetters, SendMessageSetters}, prelude::*, types::{Chat, ChatKind, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
 
-use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::{telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, token::{Token, TOKEN_TYPE_XUDT}}, repositories::{ckb::get_xudt_info, member::MemberDao, telegram::TelegramDao, token::TokenDao}};
+use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::{telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, token::{Token, TOKEN_TYPE_SPORE, TOKEN_TYPE_XUDT}}, repositories::{ckb::{get_collection_info, get_xudt_info}, member::MemberDao, telegram::TelegramDao, token::TokenDao}};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -459,23 +459,46 @@ impl TelegramService {
         
         let token = self.token_dao.get_token(type_hash_lowercase.clone()).await.unwrap();
         if token.is_none() {
-            if let Some(token_info) = get_xudt_info(type_hash_lowercase.clone()).await {
-                let new_token = Token { 
-                    type_hash: type_hash_lowercase,
-                    name: token_info.full_name, 
-                    symbol: token_info.symbol, 
-                    decimal: token_info.decimal, 
-                    description: token_info.description, 
-                    token_type: TOKEN_TYPE_XUDT, 
-                    args: token_info.type_script.clone().unwrap().args, 
-                    code_hash: token_info.type_script.clone().unwrap().code_hash, 
-                    hash_type: token_info.type_script.clone().unwrap().hash_type, 
-                    created_at: Utc::now().naive_utc(), 
-                    updated_at: Utc::now().naive_utc()
-                };
-
-                let _ = self.token_dao.add_token(new_token.clone()).await;
-                return Some(new_token);
+            match get_xudt_info(type_hash_lowercase.clone()).await {
+                Some(token_info) => {
+                    let new_token = Token { 
+                        type_hash: type_hash_lowercase,
+                        name: token_info.full_name, 
+                        symbol: token_info.symbol, 
+                        decimal: token_info.decimal, 
+                        description: token_info.description, 
+                        token_type: TOKEN_TYPE_XUDT, 
+                        args: token_info.type_script.clone().unwrap().args, 
+                        code_hash: token_info.type_script.clone().unwrap().code_hash, 
+                        hash_type: token_info.type_script.clone().unwrap().hash_type, 
+                        created_at: Utc::now().naive_utc(), 
+                        updated_at: Utc::now().naive_utc()
+                    };
+                    let _ = self.token_dao.add_token(new_token.clone()).await;
+                    return Some(new_token);
+                },
+                None => {
+                    match get_collection_info(type_hash.to_lowercase().clone()).await {
+                        Some(token_info) => {
+                            let new_token = Token { 
+                                type_hash: type_hash_lowercase,
+                                name: Some(token_info.name),
+                                symbol: Some("".to_owned()),
+                                decimal: Some("".to_owned()), 
+                                description: Some(token_info.standard), 
+                                token_type: TOKEN_TYPE_SPORE, 
+                                args: token_info.type_script.args.clone(), 
+                                code_hash: token_info.type_script.code_hash.clone(), 
+                                hash_type: token_info.type_script.hash_type.clone(), 
+                                created_at: Utc::now().naive_utc(), 
+                                updated_at: Utc::now().naive_utc(),
+                            };
+                            let _ = self.token_dao.add_token(new_token.clone()).await;
+                            return Some(new_token);
+                        },
+                        None => return None,
+                    }
+                },
             }
         }
         token
