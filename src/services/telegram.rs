@@ -1,12 +1,12 @@
 use std::{str::FromStr, sync::Arc};
 
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use serde_json::{json, Value};
 use teloxide::{
     dispatching::dialogue::GetChatId, payloads::{BanChatMemberSetters, SendMessageSetters}, prelude::*, types::{Chat, ChatKind, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
 
-use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::{telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, token::{Token, TOKEN_TYPE_XUDT}}, repositories::{ckb::get_xudt_info, member::MemberDao, telegram::TelegramDao, token::TokenDao}};
+use crate::{config::{self, MEMBER_BAN_DURATION, MEMBER_KYC_DURATION}, models::{telegram::{TelegramGroup, TelegramGroupAdmin, TelegramGroupJoined, MEMBER_STATUS_ACCEPTED, MEMBER_STATUS_PENDING, MEMBER_STATUS_REJECT}, token::{Token, TOKEN_TYPE_SPORE, TOKEN_TYPE_XUDT}}, repositories::{ckb::{get_collection_info, get_xudt_info}, member::MemberDao, telegram::TelegramDao, token::TokenDao}};
 
 #[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Available commands:")]
@@ -440,44 +440,62 @@ impl TelegramService {
     }
 
     pub async fn fetch_token(&self, type_hash: String) -> Option<Token>{
-        let type_hash_lowercase = type_hash.to_lowercase();
-        if type_hash_lowercase.is_empty() || type_hash_lowercase == "ckb"{
-            return Some(Token { 
-                type_hash: "".to_owned(),
-                name: Some("CKB".to_owned()), 
-                symbol: Some("CKB".to_owned()), 
-                decimal: Some("6".to_owned()),         
-                description: None,
-                token_type: 0,
-                args: "".to_owned(),
-                code_hash: "".to_owned(),
-                hash_type: "".to_owned(),
-                created_at: Utc::now().naive_utc(), 
-                updated_at: Utc::now().naive_utc(),
-            });
+        let type_hash = type_hash.to_lowercase();
+        let now = Utc::now().naive_utc();
+        if type_hash.is_empty() || type_hash == "ckb" {
+            return Some(Token::ckb(now));
         }
-        
-        let token = self.token_dao.get_token(type_hash_lowercase.clone()).await.unwrap();
-        if token.is_none() {
-            if let Some(token_info) = get_xudt_info(type_hash_lowercase.clone()).await {
-                let new_token = Token { 
-                    type_hash: type_hash_lowercase,
-                    name: token_info.full_name, 
-                    symbol: token_info.symbol, 
-                    decimal: token_info.decimal, 
-                    description: token_info.description, 
-                    token_type: TOKEN_TYPE_XUDT, 
-                    args: token_info.type_script.clone().unwrap().args, 
-                    code_hash: token_info.type_script.clone().unwrap().code_hash, 
-                    hash_type: token_info.type_script.clone().unwrap().hash_type, 
-                    created_at: Utc::now().naive_utc(), 
-                    updated_at: Utc::now().naive_utc()
-                };
 
-                let _ = self.token_dao.add_token(new_token.clone()).await;
-                return Some(new_token);
+        if let Ok(Some(token)) = self.token_dao.get_token(type_hash.clone()).await {
+            return Some(token);
+        }
+
+        self.fetch_and_store(type_hash, now).await
+    }
+
+    async fn fetch_and_store(&self, type_hash: String, now: NaiveDateTime) -> Option<Token> {
+        // Try XUDT
+        if let Some(info) = get_xudt_info(type_hash.clone()).await {
+            if let Some(ts) = info.type_script {
+                let tok = Token {
+                    type_hash:   type_hash.clone(),
+                    name:        info.full_name,
+                    symbol:      info.symbol,
+                    decimal:     info.decimal,
+                    description: info.description,
+                    token_type:  TOKEN_TYPE_XUDT,
+                    args:        ts.args,
+                    code_hash:   ts.code_hash,
+                    hash_type:   ts.hash_type,
+                    created_at:  now,
+                    updated_at:  now,
+                };
+                let _ = self.token_dao.add_token(tok.clone()).await;
+                return Some(tok);
             }
         }
-        token
+
+        // Fallback to collection 
+        if let Some(info) = get_collection_info(type_hash.clone()).await {
+            let ts = info.type_script;
+            let tok = Token {
+                type_hash:   type_hash.clone(),
+                name:        Some(info.name),
+                symbol:      Some(String::new()),
+                decimal:     Some(String::new()),
+                description: Some(info.standard),
+                token_type:  TOKEN_TYPE_SPORE,
+                args:        ts.args,
+                code_hash:   ts.code_hash,
+                hash_type:   ts.hash_type,
+                created_at:  now,
+                updated_at:  now,
+            };
+            let _ = self.token_dao.add_token(tok.clone()).await;
+            return Some(tok);
+        }
+
+        // Nothing found
+        None
     }
 }

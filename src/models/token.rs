@@ -30,3 +30,22 @@ pub struct Token {
     #[serde(skip_serializing)]
     pub updated_at: NaiveDateTime,
 }
+
+impl Token {
+    /// Construct the built-in CKB token
+    pub fn ckb(now: NaiveDateTime) -> Self {
+        Token {
+            type_hash: String::new(),
+            name: Some("CKB".into()),
+            symbol: Some("CKB".into()),
+            decimal: Some("6".into()),
+            description: None,
+            token_type: 0,
+            args: String::new(),
+            code_hash: String::new(),
+            hash_type: String::new(),
+            created_at: now,
+            updated_at: now,
+        }
+    }
+}
