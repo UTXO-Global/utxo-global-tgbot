@@ -1,7 +1,6 @@
 use std::{str::FromStr, sync::Arc};
 
 use chrono::{NaiveDateTime, Utc};
-use serde_json::{json, Value};
 use teloxide::{
     dispatching::dialogue::GetChatId, payloads::{BanChatMemberSetters, SendMessageSetters}, prelude::*, types::{Chat, ChatKind, ChatMemberStatus, ChatPermissions, InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageKind, ParseMode}, utils::command::BotCommands, Bot
 };
@@ -328,9 +327,7 @@ impl TelegramService {
     }
     
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
-        if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
-            let token_type_hash = group.token_address.clone().unwrap_or("CKB".to_owned());
-            let token = self.fetch_token(token_type_hash.clone()).await;
+        if let Some(_) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
             
@@ -340,13 +337,8 @@ impl TelegramService {
             }
             
             for (idx, member) in members.iter().enumerate() {
-                if member.status == MEMBER_STATUS_ACCEPTED && token.clone().is_some(){
-                    let balances = Value::from_str(&member.balances.clone().unwrap_or("{}".to_owned())).unwrap_or(json!({}));
-                    let balance = balances
-                        .get(token_type_hash.clone())
-                        .and_then(Value::as_f64)
-                        .unwrap_or(0.0);
-                    table.push_str(&format!("{}. @{} {} {} (auth: true)\n", idx+1, member.user_name, token.clone().unwrap().symbol.unwrap_or("Unknown".to_owned()), balance));
+                if member.status == MEMBER_STATUS_ACCEPTED {
+                    table.push_str(&format!("{}. @{} (auth: true)\n", idx+1, member.user_name));
                 } else {
                     table.push_str(&format!("{}. @{} (❌ Not verified yet)\n", idx+1, member.user_name));
                 }
