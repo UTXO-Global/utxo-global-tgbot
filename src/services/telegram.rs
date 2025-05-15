@@ -301,7 +301,7 @@ impl TelegramService {
     }
 
     pub async fn send_group_config_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
-        if let Some(group) = self.tele_dao.get_group(group_id).await.unwrap() {
+        if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
             let mut token_info: String = "".to_owned();
             if let Some(type_hash) = group.token_address {
                 if let Some(token) = self.fetch_token(type_hash).await {
@@ -314,11 +314,16 @@ impl TelegramService {
             } else {
                 token_info = String::from("📦 Token Gating: CKB\n");
             }
+
+            let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
+            let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
             
             let mut table = String::from("").to_owned();
             table.push_str("⚙️ Current Settings \\(Admin Only\\)\n\n");
             table.push_str(&format!("{}", token_info));
-            table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
+            table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}\n", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
+            table.push_str(&format!("👥 Verification Status: {}/{} members verified", accepted_count, members.len()));
+
             bot.send_message(chat.id, table)
             .parse_mode(ParseMode::MarkdownV2)
             .await
