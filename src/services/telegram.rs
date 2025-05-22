@@ -85,27 +85,14 @@ impl TelegramService {
 
         // Handle new chat members
         if let MessageKind::NewChatMembers(msg) = &message.kind.clone(){
-            let chat_title = match chat.kind.clone() {
-                teloxide::types::ChatKind::Public(chat_public) => &chat_public.title.unwrap_or("".to_string()),
-                teloxide::types::ChatKind::Private(chat_private) =>  &chat_private.first_name.unwrap_or("".to_string()),
-            }; 
-
             // if telegram user is admin, then add him/her to group_admins
             self.update_group_admin(bot.clone(), chat.clone()).await;
 
-            // create a new group if not exist
-            let _ = self.tele_dao.add_group(TelegramGroup{ 
-                chat_id: chat.id.to_string(), 
-                name: chat_title.to_string(), 
-                status: 1, 
-                token_address: None, 
-                min_approve_balance: Some(0), 
-                min_approve_age: Some(18), 
-                created_at: Utc::now().naive_utc(), 
-                updated_at: Utc::now().naive_utc() }).await;
+            // create a new group if not exist            
+            let group = self.get_group_or_create(chat.clone()).await.unwrap();
             
             for user in msg.clone().new_chat_members {
-                if user.is_bot{
+                if user.is_bot {
                     continue
                 }
                 
@@ -121,16 +108,15 @@ impl TelegramService {
                             reqwest::Url::from_str(kyc_link.as_str()).unwrap(),
                         )]]);
                 
-                // handle error
+                // send welcome message
                 if let Err(err) = bot
                     .send_message(
                         message.chat_id().unwrap(),
                         format!(
                             "Hello @{tgname}, welcome to the group! 👋\nPlease complete your information to get started.\n"
-
                         ),
                     ).parse_mode(ParseMode::Html)
-                    .reply_markup(keyboard)
+                    .reply_markup(keyboard.clone())
                     .await
                 {
                     log::error!(
@@ -138,11 +124,13 @@ impl TelegramService {
                         err
                     );
                 } else {
+                    // add new member
                     if let Err(err) = self.member_dao.insert_member(tgid.0 as i64, tgname.clone()).await
                     {
                         log::error!("insert new member failed: {:?}", err);
                     }
 
+                    // add new member to telegram group
                     let member_joined =self.tele_dao.get_member(chat.id.to_string(), tgid.0 as i64).await.unwrap();
                     let expired = Utc::now().naive_utc() + MEMBER_KYC_DURATION;
                     if member_joined.is_none() {
@@ -152,7 +140,7 @@ impl TelegramService {
                             user_name: tgname.clone(), 
                             ckb_address: None,
                             dob: None,
-                            status: 0,
+                            status: MEMBER_STATUS_PENDING,
                             balances: Some("{}".to_owned()),
                             expired,
                             created_at: Utc::now().naive_utc(), 
@@ -162,12 +150,49 @@ impl TelegramService {
                         let _ = self.tele_dao.update_member(None, None, chat.id.to_string(), tgid.0 as i64, expired, MEMBER_STATUS_PENDING, "{}".to_owned()).await;
                     }
                 }
+
+                // send current group settings
+                if let Err(err) = bot
+                    .send_message(
+                        message.chat_id().unwrap(),
+                        self.render_group_config(group.clone()).await,
+                        )
+                    .parse_mode(ParseMode::MarkdownV2)
+                    .await
+                {
+                    log::error!(
+                        "Could not message {tgname} (ID: {tgid}). Error: {:?}",
+                        err
+                    );
+                }
+                
             }
         } else if text.starts_with("/"){
             if let Ok(command) = CommandType::parse(text, "bot") {
                 self.handle_command(bot, message.clone(), command).await;
             }
         }
+    }
+
+    async fn render_group_config(&self, group: TelegramGroup) -> String {
+        let mut token_info: String = "".to_owned();
+        if let Some(type_hash) = group.token_address {
+            if let Some(token) = self.fetch_token(type_hash).await {
+                token_info = format!(
+                    "📦 Token Gating: {}\n🔹 Type Hash: {}\n", 
+                    token.name.unwrap(),
+                    token.type_hash
+                );
+            }
+        } else {
+            token_info = String::from("📦 Token Gating: CKB\n");
+        }
+        
+        let mut table = String::from("").to_owned();
+        table.push_str("\n\n⚙️ Current Settings \\(Admin Only\\)\n\n");
+        table.push_str(&token_info.to_string());
+        table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}\n", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
+        table
     }
 
     pub async fn handle_command(&self, bot: &Bot, message: Message, command: CommandType) {
@@ -302,26 +327,11 @@ impl TelegramService {
 
     pub async fn send_group_config_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
         if let Some(group) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
-            let mut token_info: String = "".to_owned();
-            if let Some(type_hash) = group.token_address {
-                if let Some(token) = self.fetch_token(type_hash).await {
-                    token_info = format!(
-                        "📦 Token Gating: {}\n🔹 Type Hash: {}\n", 
-                        token.name.unwrap(),
-                        token.type_hash
-                    );
-                }
-            } else {
-                token_info = String::from("📦 Token Gating: CKB\n");
-            }
 
+            let mut table = self.render_group_config(group.clone()).await;
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
             
-            let mut table = String::from("").to_owned();
-            table.push_str("⚙️ Current Settings \\(Admin Only\\)\n\n");
-            table.push_str(&format!("{}", token_info));
-            table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}\n", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
             table.push_str(&format!("👥 Verification Status: {}/{} members verified", accepted_count, members.len()));
 
             bot.send_message(chat.id, table)
@@ -332,11 +342,11 @@ impl TelegramService {
     }
     
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
-        if let Some(_) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
+        if self.tele_dao.get_group(group_id.clone()).await.unwrap().is_some(){
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
             
-            let mut table = String::from(format!("👥 Verification Status: {}/{} members verified\n\n", accepted_count, members.len()));
+            let mut table = format!("👥 Verification Status: {}/{} members verified\n\n", accepted_count, members.len());
             if members.is_empty() {
                 table.push_str("No one has joined this group.")
             }
@@ -461,9 +471,9 @@ impl TelegramService {
                     decimal:     info.decimal,
                     description: info.description,
                     token_type:  TOKEN_TYPE_XUDT,
-                    args:        ts.args,
-                    code_hash:   ts.code_hash,
-                    hash_type:   ts.hash_type,
+                    args:        ts.args.unwrap_or("".to_owned()),
+                    code_hash:   ts.code_hash.unwrap_or("".to_owned()),
+                    hash_type:   ts.hash_type.unwrap_or("".to_owned()),
                     created_at:  now,
                     updated_at:  now,
                 };
