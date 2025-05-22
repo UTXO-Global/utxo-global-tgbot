@@ -54,6 +54,7 @@ impl MemberSrv {
         {
             Ok(joined_groups) => {
                 let balances = get_balances(req.ckb_address.clone()).await;
+                println!("balances {:?}", balances);
                 let age = self.calc_age(req.dob);
                 let bot_token: String = config::get("bot_token");
                 let bot = Bot::new(bot_token);

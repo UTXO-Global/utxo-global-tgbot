@@ -320,7 +320,7 @@ impl TelegramService {
             
             let mut table = String::from("").to_owned();
             table.push_str("⚙️ Current Settings \\(Admin Only\\)\n\n");
-            table.push_str(&format!("{}", token_info));
+            table.push_str(&token_info.to_string());
             table.push_str(&format!("👤 Minimum Age: {}\n💰 Minimum Balance: {}\n", group.min_approve_age.unwrap_or(0), group.min_approve_balance.unwrap_or(0)));
             table.push_str(&format!("👥 Verification Status: {}/{} members verified", accepted_count, members.len()));
 
@@ -332,11 +332,11 @@ impl TelegramService {
     }
     
     pub async fn send_list_users_to_admin(&self, bot: Bot, group_id: String, chat: Chat) {
-        if let Some(_) = self.tele_dao.get_group(group_id.clone()).await.unwrap() {
+        if self.tele_dao.get_group(group_id.clone()).await.unwrap().is_some(){
             let members: Vec<TelegramGroupJoined> = self.tele_dao.get_member_by_group(group_id.clone()).await.unwrap_or(vec![]);
             let accepted_count = members.iter().filter(|m| m.status == MEMBER_STATUS_ACCEPTED).count();
             
-            let mut table = String::from(format!("👥 Verification Status: {}/{} members verified\n\n", accepted_count, members.len()));
+            let mut table = format!("👥 Verification Status: {}/{} members verified\n\n", accepted_count, members.len());
             if members.is_empty() {
                 table.push_str("No one has joined this group.")
             }
@@ -461,9 +461,9 @@ impl TelegramService {
                     decimal:     info.decimal,
                     description: info.description,
                     token_type:  TOKEN_TYPE_XUDT,
-                    args:        ts.args,
-                    code_hash:   ts.code_hash,
-                    hash_type:   ts.hash_type,
+                    args:        ts.args.unwrap_or("".to_owned()),
+                    code_hash:   ts.code_hash.unwrap_or("".to_owned()),
+                    hash_type:   ts.hash_type.unwrap_or("".to_owned()),
                     created_at:  now,
                     updated_at:  now,
                 };

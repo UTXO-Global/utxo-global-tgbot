@@ -2,41 +2,42 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct UdtTypeScript {
-    pub args: String,
-    pub code_hash: String,
-    pub hash_type: String,
+    pub args: Option<String>,
+    pub code_hash: Option<String>,
+    pub hash_type: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct CollectionScript {
-    pub type_hash: String,
+    pub type_hash: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct UdtAccount {
     pub symbol: Option<String>,
     pub decimal: Option<String>,
-    pub amount: String,
-    pub type_hash: String,
-    pub udt_type: String,
+    pub amount: Option<String>,
+    pub type_hash: Option<String>,
+    pub udt_type: Option<String>,
     pub collection: Option<CollectionScript>,
     pub udt_type_script: UdtTypeScript,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct AddressAttributes {
-    pub address_hash: String,
-    pub balance: String,
-    pub transactions_count: String,
-    pub live_cells_count: String,
+    pub address_hash: Option<String>,
+    pub balance: Option<String>,
+    pub transactions_count: Option<String>,
+    pub live_cells_count: Option<String>,
     pub udt_accounts: Vec<UdtAccount>,
 }
 
 #[derive(Deserialize, Debug)]
 pub struct AddressData {
-    pub id: String,
+    pub id: Option<String>,
+
     #[serde(rename = "type")]
-    pub data_type: String,
+    pub data_type: Option<String>,
     pub attributes: AddressAttributes,
 }
 

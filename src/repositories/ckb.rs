@@ -74,42 +74,68 @@ pub async fn get_balances(address: String) -> serde_json::Value {
     let network = get_ckb_network();
     let path = &format!("/v1/addresses/{}", address);
     let mut balance_map: HashMap<String, f64> = HashMap::new();
-    if let Ok(info) = proxy_request("GET", network, path, None).await {
-        if let Ok(address_response) = serde_json::from_value::<AddressResponse>(info) {
-            if let Some(address_data) = address_response.data.first() {
-                let attributes = &address_data.attributes;
-                let balance = attributes.balance.parse::<f64>().unwrap_or(0.0);
-                let balance_occupied: f64 =
-                    attributes.live_cells_count.parse::<f64>().unwrap_or(0.0);
-                balance_map.insert(
-                    "CKB".to_string(),
-                    (balance - balance_occupied) / 10f64.powi(8),
-                );
+    match proxy_request("GET", network, path, None).await {
+        Ok(info) => match serde_json::from_value::<AddressResponse>(info) {
+            Ok(address_response) => {
+                println!("address_response {:?}", address_response);
+                if let Some(address_data) = address_response.data.first() {
+                    println!("address_data {:?}", address_data);
+                    let attributes = &address_data.attributes;
+                    let balance = attributes
+                        .balance
+                        .clone()
+                        .unwrap_or("0".to_owned())
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    let balance_occupied: f64 = attributes
+                        .live_cells_count
+                        .clone()
+                        .unwrap_or("0".to_owned())
+                        .parse::<f64>()
+                        .unwrap_or(0.0);
+                    balance_map.insert(
+                        "CKB".to_string(),
+                        (balance - balance_occupied) / 10f64.powi(8),
+                    );
 
-                for udt in &attributes.udt_accounts {
-                    if udt.udt_type == "spore_cell" {
-                        if let Some(collection) = &udt.collection {
-                            balance_map.insert(collection.type_hash.clone(), 1.0);
-                        }
-                    } else {
-                        let amount = udt.amount.parse::<f64>().unwrap_or(0.0);
-                        let decimal = udt
-                            .decimal
-                            .clone()
-                            .unwrap_or("1".to_owned())
-                            .parse::<u32>()
-                            .unwrap_or(1);
-
-                        let balance = if decimal > 0 {
-                            amount / 10f64.powi(decimal as i32)
+                    for udt in &attributes.udt_accounts {
+                        if udt.udt_type.clone().unwrap_or("".to_owned()) == "spore_cell" {
+                            if let Some(collection) = &udt.collection {
+                                if collection.type_hash.is_some() {
+                                    balance_map.insert(collection.type_hash.clone().unwrap(), 1.0);
+                                }
+                            }
                         } else {
-                            amount
-                        };
+                            let amount = udt
+                                .amount
+                                .clone()
+                                .unwrap_or("0".to_owned())
+                                .parse::<f64>()
+                                .unwrap_or(0.0);
+                            let decimal = udt
+                                .decimal
+                                .clone()
+                                .unwrap_or("1".to_owned())
+                                .parse::<u32>()
+                                .unwrap_or(1);
 
-                        balance_map.insert(udt.type_hash.clone(), balance);
+                            let balance = if decimal > 0 {
+                                amount / 10f64.powi(decimal as i32)
+                            } else {
+                                amount
+                            };
+
+                            if udt.type_hash.is_some() {
+                                balance_map.insert(udt.type_hash.clone().unwrap(), balance);
+                            }
+                        }
                     }
                 }
             }
+            Err(err) => println!("Parse AddressResponse {:?}", err),
+        },
+        Err(err) => {
+            println!("Call API Error: {:?}", err)
         }
     }
     json!(balance_map)
