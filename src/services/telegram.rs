@@ -158,7 +158,6 @@ impl TelegramService {
                         self.render_group_config(group.clone()).await,
                         )
                     .parse_mode(ParseMode::MarkdownV2)
-                    .reply_markup(keyboard.clone())
                     .await
                 {
                     log::error!(
