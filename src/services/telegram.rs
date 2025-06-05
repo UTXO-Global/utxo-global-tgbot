@@ -431,7 +431,7 @@ impl TelegramService {
                             member.clone().chat_id.to_string(),
                             format!(
                                 "🔴 **{}** failed verification and was removed.\n\
-                                _Reason:_ didn’t complete verification within 3 minutes.\n\
+                                _Reason:_ didn’t complete verification within 5 minutes.\n\
                                 They can rejoin and try again after the 15‑minute cooldown.",
                                 member.clone().user_name,
                             ),
